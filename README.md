@@ -1,49 +1,29 @@
-# sns_ads_analyze.py(Ver2)
+# exp/user/clustering (v1.0)
 
-## 概要
-SNS広告のクリック・購入データを用いてユーザー・広告のセグメント化を行い、クリック・購入の行動予測を実施。
-セグメント別の傾向把握や予測モデルの構築から、成果改善の示唆出しを目的とする。
-尚、Kaggleの公開データセットを用いている。
-データは若年層向けの総合ファッションECのものと仮定して進める。
+## 🧭 目的
+ユーザー特徴量でのクラスタリングを実施。
 
-## ディレクトリ構成
-project/
-├─ rawdata/ # 元データ（ads.csv, users.csvなど）
-├─ sns_ads_analyze.py # Pythonスクリプト
-└─ README.md
+## 🔄 実施内容
+- 特徴量に以下を使用
+"day_of_week","user_gender","user_age","hour_sin","hour_cos"
+"art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"
+- カテゴリカル変数として"day_of_week","user_gender"をワンホットエンコーディング
+- k=5 を仮置きで設定
+- 標準化＋PCAで2次元化して分布確認
 
-## 使用技術
-- Python 3.13.7
-- numpy / pandas / scikit-learn / matplotlib / seaborn
-- Cursor
-- Git / GitHub
+## ⚙️ 使用データ
+- users.csv
+- events.csv
 
-## 実行方法
-sns_ads_analyze.py を実行
+## 📊 現状の結果
+- PCAのX軸は年齢の影響を強く受けている印象。（X軸のみでクラスタが決定されている状況）
+- Y軸はカテゴリカル変数が多すぎて分散している。
 
-## 分析内容
-### 実施内容
-- 全レコードを対象にデータの前処理を実行。
-- imp・click・engagementカラムを追加
-- interestの,を外してワンホットエンコーディング
-- timestampからmonth・day・day_from_start・hour・hour_sin・hour_cosカラムを作成
-- クリック比率を保ったまま、テストデータと訓練データに分割（テスト2割）
+## 🚧 今後の課題
+- カテゴリカル変数のエンコーディング方法を見直して再検証
+day_of_week：周期エンコーディング など
 
-### 今後の予定
-- データの前処理（特徴量）
-- KMeans法を用いてクラスタリングを実施
-- LightGBM、ランダムフォレストなどでClick・Purchseそれぞれの行動予測を実施
-
-クラスタリング、行動予測はユーザー属性を示す特徴量、広告属性を示す特徴量、ユーザー・広告属性を統合した特徴量による3パターンを実施。
-また、ユーザーセグメントｘ広告セグメントによる行動予測も実施予定
-
-## 分析結果
-- 処理のみなので今回は無し
-
-## バージョン履歴
-**Ver3(2025-10-18)**:全レコードを対象にデータの前処理を実行。その後テストデータと訓練データに分割
-**Ver2(2025-10-17)**:コーディングの仕様変更（#%%を用いた記述に変更。特徴量の分布確認などを実行）
-**Ver1(2025-10-15)**:初回（データの読み込み・統合・データの前処理）
-
-## ライセンス
-BSD 3-Clause License
+## 📝 備考
+- branch: `feature/clustering-user-v3.1-draft`
+- status: **検証中**
+- 最終マージ予定：10/17 ver3
