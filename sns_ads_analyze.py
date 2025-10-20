@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -115,7 +116,7 @@ X_train_encoded[num_cols] = scaler.fit_transform(X_train_encoded[num_cols])
 print(f'標準化結果：{X_train_encoded.head(10)}')
 
 # %% データをCSVで確認
-X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_head1000.csv")
+#X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_head1000.csv")
 
 
 # %% 訓練データをdfからarrayに変換
@@ -129,6 +130,7 @@ km = KMeans(n_clusters=k, init= "random", random_state=0, n_init='auto')
 # モデルの学習と予測を実行
 Y_km = km.fit_predict(X_train_arr)
 print(Y_km)
+
 
 # %% PCAで特徴量を2次元に圧縮
 pca = PCA(n_components=2, random_state=0)
@@ -149,4 +151,24 @@ plt.legend()
 
 plt.savefig('outputs/figures/kmeans_clusters_user_v1.png', dpi=300, bbox_inches='tight')
 plt.show()
+
+# %% クラスタリングの評価
+# silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
+dbi = davies_bouldin_score(X_train_arr, Y_km)
+ch = calinski_harabasz_score(X_train_arr, Y_km)
+
+# print(f"Silhouette Score: {silhouette:.3f}")
+print(f"Davies-Bouldin Index: {dbi:.3f}")
+print(f"Calinski-Harabasz Index: {ch:.3f}")
+
+# %% X_train_arrをデータフレームに変換
+df = pd.DataFrame(X_train_arr,columns=X_train_encoded.columns)
+df["cluster"] = Y_km
+df.head(10).to_csv("outputs/df_cluster1.csv")
+
+# %% 各クラスタの特徴量傾向を把握
+cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
+print(cluster_summary)
+cluster_summary.to_csv("outputs/df_cluster1_mean.csv")
+
 # %%
