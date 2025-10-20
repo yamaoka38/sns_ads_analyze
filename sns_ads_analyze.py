@@ -104,8 +104,27 @@ use_cols = [
 X_train = train_all[use_cols]
 X_train = X_train.copy()
 
-# カテゴリカル変数をワンホットエンコーディング
-cat_cols = ["day_of_week","user_gender"]
+# %% 曜日を周期エンコーディング
+## 曜日を数値化(マッピング)
+weekday_map = {
+        "Monday":0,
+        "Tuesday":1,
+        "Wednesday":2,
+        "Thursday":3,
+        "Friday":4,
+        "Saturday":5,
+        "Sunday":6,
+    }
+
+# 数値化
+X_train["weekday_num"] = X_train["day_of_week"].map(weekday_map)
+
+X_train["weekday_sin"] = np.sin(2 * np.pi * X_train["weekday_num"] / 7)
+X_train["weekday_cos"] = np.cos(2 * np.pi * X_train["weekday_num"] / 7)
+X_train = X_train.drop(columns=["weekday_num","day_of_week"])
+
+# カテゴリカル変数（性別）をワンホットエンコーディング
+cat_cols = ["user_gender"]
 X_train_encoded = pd.get_dummies(X_train, columns=cat_cols, drop_first=False, dtype=int)
 print(f'ワンホットエンコーディング結果：{X_train_encoded.head(10)}')
 
@@ -114,9 +133,14 @@ scaler = StandardScaler()
 num_cols = ["user_age"]
 X_train_encoded[num_cols] = scaler.fit_transform(X_train_encoded[num_cols])
 print(f'標準化結果：{X_train_encoded.head(10)}')
+#後処理用に、下記も計算
+mean_age = X_train["user_age"].mean()
+std_age = X_train["user_age"].std()
+print(f'平均年齢：{mean_age}')
+print(f'年齢標準偏差：{std_age}')
 
 # %% データをCSVで確認
-#X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_head1000.csv")
+X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_2_head1000.csv")
 
 
 # %% 訓練データをdfからarrayに変換
@@ -149,7 +173,7 @@ plt.ylabel('PCA Component 2')
 plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
 plt.legend()
 
-plt.savefig('outputs/figures/kmeans_clusters_user_v1.png', dpi=300, bbox_inches='tight')
+plt.savefig('outputs/figures/kmeans_clusters_user_v2.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # %% クラスタリングの評価
@@ -164,11 +188,40 @@ print(f"Calinski-Harabasz Index: {ch:.3f}")
 # %% X_train_arrをデータフレームに変換
 df = pd.DataFrame(X_train_arr,columns=X_train_encoded.columns)
 df["cluster"] = Y_km
-df.head(10).to_csv("outputs/df_cluster1.csv")
+df.head(10).to_csv("outputs/df_cluster2.csv")
 
-# %% 各クラスタの特徴量傾向を把握
+# %% 年齢を元に戻す（手計算）
+df["user_age"] = df["user_age"] * std_age + mean_age
+print(df["user_age"].head(30))
+
+
+# %% 時間を24時間表記に戻す
+df["hour"] = np.degrees(np.arctan2(df["hour_sin"], df["hour_cos"])) * (24 / 360)
+df["hour"] = (df["hour"] + 24) % 24
+print(df["hour"].head(30))
+
+# %% 曜日を元に戻す
+df["weekday_num"] = np.degrees(np.arctan2(df["weekday_sin"], df["weekday_cos"])) * (7 / 360)
+df["weekday_num"] = (df["weekday_num"] + 7) % 7  # 負の値補正
+df["weekday_num"] = df["weekday_num"].round().astype(int)
+
+# キーと値を入れ替えた辞書を作成（逆マップ）
+weekday_map_inv = {v: k for k, v in weekday_map.items()}
+
+df['weekday'] = df['weekday_num'].map(weekday_map_inv)
+print(df['weekday'].head(30))
+
+# %% 各クラスタの特徴量傾向を把握(数値の平均値)
 cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
 print(cluster_summary)
-cluster_summary.to_csv("outputs/df_cluster1_mean.csv")
+cluster_summary.to_csv("outputs/df_cluster2_mean.csv")
+
+# %% 各クラスタの特徴量傾向を把握(曜日)
+# 件数集計
+ct = pd.crosstab(df["cluster"], df["weekday"])
+# 件数→割合（行方向に正規化）
+ct_pct = ct.div(ct.sum(axis=1), axis=0) * 100
+# CSV出力
+ct_pct.to_csv("outputs/cluster_weekday_ratio_2.csv", encoding="utf-8-sig")
 
 # %%
