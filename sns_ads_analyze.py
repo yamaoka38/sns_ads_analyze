@@ -98,8 +98,7 @@ test_all = df_merged.loc[test_idx].reset_index(drop=True)
 
 # %%  クラスタリングに使用するカラムを選択
 use_cols = [
-"day_of_week","user_gender","user_age","hour_sin","hour_cos",
-"art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"
+"day_of_week","user_gender","user_age","hour_sin","hour_cos"
 ]
 X_train = train_all[use_cols]
 X_train = X_train.copy()
@@ -140,7 +139,7 @@ print(f'平均年齢：{mean_age}')
 print(f'年齢標準偏差：{std_age}')
 
 # %% データをCSVで確認
-X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_2_head1000.csv")
+X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_3_head1000.csv")
 
 
 # %% 訓練データをdfからarrayに変換
@@ -173,7 +172,7 @@ plt.ylabel('PCA Component 2')
 plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
 plt.legend()
 
-plt.savefig('outputs/figures/kmeans_clusters_user_v2.png', dpi=300, bbox_inches='tight')
+plt.savefig('outputs/figures/kmeans_clusters_user_v3.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # %% クラスタリングの評価
@@ -214,7 +213,7 @@ print(df['weekday'].head(30))
 # %% 各クラスタの特徴量傾向を把握(数値の平均値)
 cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
 print(cluster_summary)
-cluster_summary.to_csv("outputs/df_cluster2_mean.csv")
+cluster_summary.to_csv("outputs/df_cluster3_mean.csv")
 
 # %% 各クラスタの特徴量傾向を把握(曜日)
 # 件数集計
@@ -222,6 +221,6 @@ ct = pd.crosstab(df["cluster"], df["weekday"])
 # 件数→割合（行方向に正規化）
 ct_pct = ct.div(ct.sum(axis=1), axis=0) * 100
 # CSV出力
-ct_pct.to_csv("outputs/cluster_weekday_ratio_2.csv", encoding="utf-8-sig")
+ct_pct.to_csv("outputs/cluster_weekday_ratio_3.csv", encoding="utf-8-sig")
 
 # %%
