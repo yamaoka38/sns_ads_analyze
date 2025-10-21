@@ -141,22 +141,27 @@ print(f'年齢標準偏差：{std_age}')
 # %% データをCSVで確認
 # X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_3_head1000.csv")
 
-
 # %% 訓練データをdfからarrayに変換
 X_train_arr = X_train_encoded.to_numpy()
 
-# まずはkの検証範囲を設定
-k_range = range(2, 11)
+# %% 比較のためにPCAを1回実行
+pca = PCA(n_components=2, random_state=0)
+X_pca = pca.fit_transform(X_train_arr)
+
+# 検証するk数を指定
+k_list = [4,6,8]
 
 # スコア格納リストを作成
 dbi_list, ch_list = [], []
 
-for k in k_range:
+# グラフの描画領域を準備
+fig, axes = plt.subplots(1, 3, figsize=(15, 4), constrained_layout=True)
+
+for ax, k in zip(axes, k_list):
     # kmインスタンスを作成
     km = KMeans(n_clusters=k, init= "random", random_state=0, n_init="auto")
     # モデルの学習と予測を実行
     Y_km = km.fit_predict(X_train_arr)
-    print(Y_km)
 
     # クラスタリングの評価
     # silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
@@ -168,40 +173,27 @@ for k in k_range:
 
     print(f"k={k} | DBI={dbi:.3f}, CH={ch:.1f}")
 
+    # 散布図を作成
+    sc = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=Y_km, s=10, alpha=0.6)
+    ax.set_title(f"k={k} | DBI={dbi:.3f} ↓  CH={ch:.1f} ↑")
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")    
+
+plt.suptitle("PCA Scatter by k (KMeans, common PCA space)", y=1.03, fontsize=12)
+plt.savefig("outputs/figures/lcustering_user_kmeans_pca_k4_6_8.png", dpi=300, bbox_inches='tight')
+plt.show()
+
 # スコアをデータフレーム化
 score_df = pd.DataFrame({
-    "k": k_range,
+    "k": k_list,
     "DBI": dbi_list,
     "CH": ch_list
 })
 
-score_df.to_csv("outputs/clustering__user_score_compare-k.csv")
+score_df.to_csv("outputs/clustering__user_score_compare-k2.csv")
 
 # ベストスコアを確認
 best_k_dbi = score_df.loc[score_df["DBI"].idxmin(), "k"]
 best_k_ch = score_df.loc[score_df["CH"].idxmax(), "k"]
 print(f"・DBI最小 → DBI={score_df["DBI"].min()}, k={best_k_dbi}")
 print(f"・CH最大 → CH={score_df["CH"].max()}, k={best_k_ch}")
-
-# --- グラフ描画 ---
-fig, ax1 = plt.subplots(figsize=(8, 5))
-color_ch = "tab:blue"
-color_dbi = "tab:red"
-
-# CH（左軸）
-ax1.set_xlabel("k (number of clusters)")
-ax1.set_ylabel("Calinski-Harabasz (↑)", color=color_ch)
-ax1.plot(k_range, ch_list, marker="s", color=color_ch, label="CH (↑)")
-ax1.tick_params(axis="y", labelcolor=color_ch)
-
-# DBI（右軸）
-ax2 = ax1.twinx()  # 右軸を作成
-ax2.set_ylabel("Davies-Bouldin (↓)", color=color_dbi)
-ax2.plot(k_range, dbi_list, marker="o", color=color_dbi, label="DBI (↓)")
-ax2.tick_params(axis="y", labelcolor=color_dbi)
-
-# グラフタイトルと凡例
-fig.suptitle("DBI (↓) & CH (↑) by Cluster Number", fontsize=13)
-fig.tight_layout()
-plt.savefig("outputs/figures/kmeans_clusters_user_compare_k.png", dpi=300, bbox_inches="tight")
-plt.show()
