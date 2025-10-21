@@ -139,88 +139,69 @@ print(f'平均年齢：{mean_age}')
 print(f'年齢標準偏差：{std_age}')
 
 # %% データをCSVで確認
-X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_3_head1000.csv")
+# X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_3_head1000.csv")
 
 
 # %% 訓練データをdfからarrayに変換
 X_train_arr = X_train_encoded.to_numpy()
 
-# まずはkを仮置き
-k = 5
+# まずはkの検証範囲を設定
+k_range = range(2, 11)
 
-# kmインスタンスを作成
-km = KMeans(n_clusters=k, init= "random", random_state=0, n_init='auto')
-# モデルの学習と予測を実行
-Y_km = km.fit_predict(X_train_arr)
-print(Y_km)
+# スコア格納リストを作成
+dbi_list, ch_list = [], []
 
+for k in k_range:
+    # kmインスタンスを作成
+    km = KMeans(n_clusters=k, init= "random", random_state=0, n_init="auto")
+    # モデルの学習と予測を実行
+    Y_km = km.fit_predict(X_train_arr)
+    print(Y_km)
 
-# %% PCAで特徴量を2次元に圧縮
-pca = PCA(n_components=2, random_state=0)
-X_pca = pca.fit_transform(X_train_arr)
+    # クラスタリングの評価
+    # silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
+    dbi = davies_bouldin_score(X_train_arr, Y_km)
+    ch = calinski_harabasz_score(X_train_arr, Y_km)
 
-# セントロイド（クラスタ中心）もPCA空間に変換
-centers_pca = pca.transform(km.cluster_centers_)
+    dbi_list.append(dbi)
+    ch_list.append(ch)
 
-# 散布図で可視化
-plt.figure(figsize=(6, 6))
-plt.scatter(X_pca[:, 0], X_pca[:, 1], c=Y_km, cmap='viridis', alpha=0.6)
-plt.scatter(centers_pca[:, 0], centers_pca[:, 1], 
-            c='red', s=200, marker='X', label='Centroids')
-plt.xlabel('PCA Component 1')
-plt.ylabel('PCA Component 2')
-plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
-plt.legend()
+    print(f"k={k} | DBI={dbi:.3f}, CH={ch:.1f}")
 
-plt.savefig('outputs/figures/kmeans_clusters_user_v3.png', dpi=300, bbox_inches='tight')
+# スコアをデータフレーム化
+score_df = pd.DataFrame({
+    "k": k_range,
+    "DBI": dbi_list,
+    "CH": ch_list
+})
+
+score_df.to_csv("outputs/clustering__user_score_compare-k.csv")
+
+# ベストスコアを確認
+best_k_dbi = score_df.loc[score_df["DBI"].idxmin(), "k"]
+best_k_ch = score_df.loc[score_df["CH"].idxmax(), "k"]
+print(f"・DBI最小 → DBI={score_df["DBI"].min()}, k={best_k_dbi}")
+print(f"・CH最大 → CH={score_df["CH"].max()}, k={best_k_ch}")
+
+# --- グラフ描画 ---
+fig, ax1 = plt.subplots(figsize=(8, 5))
+color_ch = "tab:blue"
+color_dbi = "tab:red"
+
+# CH（左軸）
+ax1.set_xlabel("k (number of clusters)")
+ax1.set_ylabel("Calinski-Harabasz (↑)", color=color_ch)
+ax1.plot(k_range, ch_list, marker="s", color=color_ch, label="CH (↑)")
+ax1.tick_params(axis="y", labelcolor=color_ch)
+
+# DBI（右軸）
+ax2 = ax1.twinx()  # 右軸を作成
+ax2.set_ylabel("Davies-Bouldin (↓)", color=color_dbi)
+ax2.plot(k_range, dbi_list, marker="o", color=color_dbi, label="DBI (↓)")
+ax2.tick_params(axis="y", labelcolor=color_dbi)
+
+# グラフタイトルと凡例
+fig.suptitle("DBI (↓) & CH (↑) by Cluster Number", fontsize=13)
+fig.tight_layout()
+plt.savefig("outputs/figures/kmeans_clusters_user_compare_k.png", dpi=300, bbox_inches="tight")
 plt.show()
-
-# %% クラスタリングの評価
-# silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
-dbi = davies_bouldin_score(X_train_arr, Y_km)
-ch = calinski_harabasz_score(X_train_arr, Y_km)
-
-# print(f"Silhouette Score: {silhouette:.3f}")
-print(f"Davies-Bouldin Index: {dbi:.3f}")
-print(f"Calinski-Harabasz Index: {ch:.3f}")
-
-# %% X_train_arrをデータフレームに変換
-df = pd.DataFrame(X_train_arr,columns=X_train_encoded.columns)
-df["cluster"] = Y_km
-df.head(10).to_csv("outputs/df_cluster2.csv")
-
-# %% 年齢を元に戻す（手計算）
-df["user_age"] = df["user_age"] * std_age + mean_age
-print(df["user_age"].head(30))
-
-
-# %% 時間を24時間表記に戻す
-df["hour"] = np.degrees(np.arctan2(df["hour_sin"], df["hour_cos"])) * (24 / 360)
-df["hour"] = (df["hour"] + 24) % 24
-print(df["hour"].head(30))
-
-# %% 曜日を元に戻す
-df["weekday_num"] = np.degrees(np.arctan2(df["weekday_sin"], df["weekday_cos"])) * (7 / 360)
-df["weekday_num"] = (df["weekday_num"] + 7) % 7  # 負の値補正
-df["weekday_num"] = df["weekday_num"].round().astype(int)
-
-# キーと値を入れ替えた辞書を作成（逆マップ）
-weekday_map_inv = {v: k for k, v in weekday_map.items()}
-
-df['weekday'] = df['weekday_num'].map(weekday_map_inv)
-print(df['weekday'].head(30))
-
-# %% 各クラスタの特徴量傾向を把握(数値の平均値)
-cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
-print(cluster_summary)
-cluster_summary.to_csv("outputs/df_cluster3_mean.csv")
-
-# %% 各クラスタの特徴量傾向を把握(曜日)
-# 件数集計
-ct = pd.crosstab(df["cluster"], df["weekday"])
-# 件数→割合（行方向に正規化）
-ct_pct = ct.div(ct.sum(axis=1), axis=0) * 100
-# CSV出力
-ct_pct.to_csv("outputs/cluster_weekday_ratio_3.csv", encoding="utf-8-sig")
-
-# %%
