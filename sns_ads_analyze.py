@@ -26,12 +26,13 @@ df_ads = pd.read_csv('rawdata/ads.csv')
 df_cps = pd.read_csv('rawdata/campaigns.csv')
 df_users = pd.read_csv('rawdata/users.csv')
 
+'''
 # 読み込みデータの確認
 print(f'df_events:{df_events.head(5)}')
 print(f'df_ads:{df_ads.head(5)}')
 print(f'df_cps:{df_cps.head(5)}')
 print(f'df_users:{df_users.head(5)}')
-
+'''
 # %% # データの中身を確認する関数を定義
 def check_data(df):
     print('上位10件')
@@ -112,19 +113,36 @@ X_train_s = train_all[use_cols]
 X_train = X_train_s.copy()
 
 #%%
-print(X_train.head(5))
+#print(X_train.head(5))
 #X_train.head(30).to_csv(f"outputs/X_train_adfeat_{timestamp}.csv")
+
+#%% target_interestsのユニーク値を確認
+#print(X_train["target_interests"].unique())
+#X_train["target_interests"].to_csv(f"outputs/X_train_tinterests_{timestamp}.csv")
 
 #%% target_interests を変換
 ## カンマ区切りをリストに変換
 X_train["t_interests_list"] = X_train["target_interests"].str.split(",")
 ## リストをワンホットエンコーディング
 df_t_interests = X_train["t_interests_list"].explode().str.strip().str.get_dummies().groupby(level=0).sum()
+print("df_t_interests")
+print(df_t_interests.head(10))
 ## 元のdfに結合
 X_train = pd.concat([X_train, df_t_interests], axis=1)
-print(X_train.head(5))
-X_train.head(30).to_csv(f"outputs/X_train_adfeat_tinterest_{timestamp}.csv")
-X_train = X_train.drop(columns=["target_interests","t_interests_list"],axis=1)
+X_train = X_train.drop(["t_interests_list","target_interests"],axis=1)
+
+# PCAで次元圧縮
+pca = PCA(n_components=2)
+df_t_interests_pca = pca.fit_transform(df_t_interests)
+X_train["pca_interest_1"] = df_t_interests_pca[:, 0]
+X_train["pca_interest_2"] = df_t_interests_pca[:, 1]
+
+print("pca.explained_variance_ratio_")
+print(pca.explained_variance_ratio_)
+X_train.head(30).to_csv(f"outputs/X_train_pca_head30_{timestamp}.csv")
+
+#%%
+
 
 # %% カテゴリカル変数をワンホットエンコーディング
 cat_cols = ["ad_platform","ad_type","target_gender","target_age_group"]
@@ -134,7 +152,7 @@ print(f'ワンホットエンコーディング結果：{X_train_encoded.head(10
 
 # %% imp/click/purchaseを削除
 X_train_encoded_drop = X_train_encoded.copy()
-X_train_encoded_drop = X_train_encoded_drop.drop(["Purchase","imp","click"], axis=1)
+X_train_encoded_drop = X_train_encoded_drop.drop(["Purchase","imp","click","art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"], axis=1)
 print(f"drop前:{X_train_encoded.head(5)}")
 print(f"drop後:{X_train_encoded_drop.head(5)}")
 
@@ -146,7 +164,7 @@ print(f"標準化後：{X_train_encoded_drop.head(10)}")
 
 #%%
 # %% 前処理後のデータをCSVで確認
-X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad_head_{timestamp}.csv")
+X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad2_head_{timestamp}.csv")
 
 
 # %% 訓練データをdfからarrayに変換
@@ -178,7 +196,7 @@ plt.xlabel('PCA Component 1')
 plt.ylabel('PCA Component 2')
 plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
 plt.legend()
-plt.savefig(f'outputs/figures/kmeans_clusters_ad_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'outputs/figures/kmeans_clusters_ad2_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # %% クラスタリングの評価
@@ -193,7 +211,7 @@ print(f"Calinski-Harabasz Index: {ch:.3f}")
 # %% クラスタ番号をdfに結合
 Y_km_s = pd.Series(Y_km, index=X_train_encoded.index, name="cluster")
 df = X_train_encoded.join(Y_km_s)
-df.head(10).to_csv(f"outputs/df_cluster_k=6_ad_{timestamp}.csv")
+df.head(10).to_csv(f"outputs/df_cluster_k=6_ad2_{timestamp}.csv")
 
 # %% クラスタ毎のCTR・CVR・CTVRを計算
 agg = (
@@ -222,22 +240,5 @@ print(cluster_summary)
 # %% 全出力をマージ
 df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
 print(df_cluster_feat)
-df_cluster_feat.to_csv(f"outputs/df_cluster_ad_feat_k=6_{timestamp}.csv")
+df_cluster_feat.to_csv(f"outputs/df_cluster_ad2_feat_k=6_{timestamp}.csv")
 
-
-'''
-# %% 各クラスタの特徴量傾向を把握(曜日)
-# 件数集計
-ct = pd.crosstab(df["cluster"], df["weekday"])
-# 件数→割合（行方向に正規化）
-ct_pct = ct.div(ct.sum(axis=1), axis=0) 
-weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-ct_pct = ct_pct[weekday_order]
-print(ct_pct)
-
-
-#%%
-
-
-# %%
-'''
