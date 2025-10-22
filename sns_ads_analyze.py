@@ -104,63 +104,49 @@ test_all = df_merged.loc[test_idx].reset_index(drop=True)
 
 # %%  クラスタリングに使用するカラムを選択
 use_cols = [
-"day_of_week","user_gender","user_age","hour_sin","hour_cos","Purchase","imp","click"
+"ad_platform","ad_type",
+"target_gender","target_age_group","target_interests","duration_days","total_budget",
+"Purchase","imp","click"
 ]
 X_train_s = train_all[use_cols]
 X_train = X_train_s.copy()
 
 #%%
 print(X_train.head(5))
+#X_train.head(30).to_csv(f"outputs/X_train_adfeat_{timestamp}.csv")
 
-
-# %% 曜日を周期エンコーディング
-## 曜日を数値化(マッピング)
-weekday_map = {
-        "Monday":0,
-        "Tuesday":1,
-        "Wednesday":2,
-        "Thursday":3,
-        "Friday":4,
-        "Saturday":5,
-        "Sunday":6,
-    }
-
-# 数値化
-X_train["weekday_num"] = X_train["day_of_week"].map(weekday_map)
-
-X_train["weekday_sin"] = np.sin(2 * np.pi * X_train["weekday_num"] / 7)
-X_train["weekday_cos"] = np.cos(2 * np.pi * X_train["weekday_num"] / 7)
-X_train = X_train.drop(columns=["weekday_num","day_of_week"])
-
+#%% target_interests を変換
+## カンマ区切りをリストに変換
+X_train["t_interests_list"] = X_train["target_interests"].str.split(",")
+## リストをワンホットエンコーディング
+df_t_interests = X_train["t_interests_list"].explode().str.strip().str.get_dummies().groupby(level=0).sum()
+## 元のdfに結合
+X_train = pd.concat([X_train, df_t_interests], axis=1)
 print(X_train.head(5))
+X_train.head(30).to_csv(f"outputs/X_train_adfeat_tinterest_{timestamp}.csv")
+X_train = X_train.drop(columns=["target_interests","t_interests_list"],axis=1)
 
-# %% カテゴリカル変数（性別）をワンホットエンコーディング
-cat_cols = ["user_gender"]
+# %% カテゴリカル変数をワンホットエンコーディング
+cat_cols = ["ad_platform","ad_type","target_gender","target_age_group"]
 X_train_encoded = pd.get_dummies(X_train, columns=cat_cols, drop_first=False, dtype=int)
 print(f'ワンホットエンコーディング結果：{X_train_encoded.head(10)}')
+#X_train_encoded.head(30).to_csv(f"outputs/X_train_adfeat_caten_{timestamp}.csv")
 
-print(X_train_encoded.head(5))
-
-# %% user_age を標準化
-scaler = StandardScaler()
-num_cols = ["user_age"]
-X_train_encoded[num_cols] = scaler.fit_transform(X_train_encoded[num_cols])
-print(f'標準化結果：{X_train_encoded.head(10)}')
-#後処理用に、下記も計算
-mean_age = X_train["user_age"].mean()
-std_age = X_train["user_age"].std()
-print(f'平均年齢：{mean_age}')
-print(f'年齢標準偏差：{std_age}')
-
-print(X_train_encoded.head(5))
-
-# %% データをCSVで確認
-# X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_3_head1000.csv")
-
+# %% imp/click/purchaseを削除
 X_train_encoded_drop = X_train_encoded.copy()
 X_train_encoded_drop = X_train_encoded_drop.drop(["Purchase","imp","click"], axis=1)
-print(X_train_encoded.head(5))
-print(X_train_encoded_drop.head(5))
+print(f"drop前:{X_train_encoded.head(5)}")
+print(f"drop後:{X_train_encoded_drop.head(5)}")
+
+# %% 数値特徴量 を標準化
+scaler = StandardScaler()
+num_cols = ["duration_days","total_budget"]
+X_train_encoded_drop[num_cols] = scaler.fit_transform(X_train_encoded_drop[num_cols])
+print(f"標準化後：{X_train_encoded_drop.head(10)}")
+
+#%%
+# %% 前処理後のデータをCSVで確認
+X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad_head_{timestamp}.csv")
 
 
 # %% 訓練データをdfからarrayに変換
@@ -192,7 +178,7 @@ plt.xlabel('PCA Component 1')
 plt.ylabel('PCA Component 2')
 plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
 plt.legend()
-plt.savefig(f'outputs/figures/kmeans_clusters_user_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'outputs/figures/kmeans_clusters_ad_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # %% クラスタリングの評価
@@ -204,39 +190,10 @@ ch = calinski_harabasz_score(X_train_arr, Y_km)
 print(f"Davies-Bouldin Index: {dbi:.3f}")
 print(f"Calinski-Harabasz Index: {ch:.3f}")
 
-# %% クラスタ番号をdf1に結合
+# %% クラスタ番号をdfに結合
 Y_km_s = pd.Series(Y_km, index=X_train_encoded.index, name="cluster")
 df = X_train_encoded.join(Y_km_s)
-df.head(10).to_csv(f"outputs/df_cluster_k=6_{timestamp}.csv")
-
-# %% 年齢を元に戻す（手計算）
-df["user_age"] = df["user_age"] * std_age + mean_age
-print(df["user_age"].head(30))
-
-# %% 時間を24時間表記に戻す
-df["hour"] = np.degrees(np.arctan2(df["hour_sin"], df["hour_cos"])) * (24 / 360)
-df["hour"] = (df["hour"] + 24) % 24
-print(df["hour"].head(30))
-
-# %% 曜日を元に戻す
-df["weekday_num"] = np.degrees(np.arctan2(df["weekday_sin"], df["weekday_cos"])) * (7 / 360)
-df["weekday_num"] = (df["weekday_num"] + 7) % 7  # 負の値補正
-df["weekday_num"] = df["weekday_num"].round().astype(int)
-
-# キーと値を入れ替えた辞書を作成（逆マップ）
-weekday_map_inv = {v: k for k, v in weekday_map.items()}
-
-df['weekday'] = df['weekday_num'].map(weekday_map_inv)
-print(df['weekday'].head(30))
-
-# %% 各クラスタの特徴量傾向を把握(曜日)
-# 件数集計
-ct = pd.crosstab(df["cluster"], df["weekday"])
-# 件数→割合（行方向に正規化）
-ct_pct = ct.div(ct.sum(axis=1), axis=0) 
-weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-ct_pct = ct_pct[weekday_order]
-print(ct_pct)
+df.head(10).to_csv(f"outputs/df_cluster_k=6_ad_{timestamp}.csv")
 
 # %% クラスタ毎のCTR・CVR・CTVRを計算
 agg = (
@@ -257,20 +214,30 @@ agg["CTVR"] = np.where(agg["impressions"] > 0,
                       agg["CTR"] * agg["CVR"]*100, np.nan)
 print(agg.reset_index())
 print(agg)
-#%%
 
 # %% 各クラスタの特徴量傾向を把握(数値の平均値)
 cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
 print(cluster_summary)
 
 # %% 全出力をマージ
-df_cluster_feat = pd.concat([cluster_summary,ct_pct,agg],axis=1)
+df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
 print(df_cluster_feat)
+df_cluster_feat.to_csv(f"outputs/df_cluster_ad_feat_k=6_{timestamp}.csv")
 
-# %%  不要な列を削除
-drop_list = ["hour_sin","hour_cos","Purchase","imp","click","weekday_sin","weekday_cos"]
-df_cluster_feat_drop = df_cluster_feat.copy()
-df_cluster_feat_drop = df_cluster_feat_drop.drop(columns=drop_list,axis=1)
-print(df_cluster_feat_drop)
-df_cluster_feat_drop.to_csv(f"outputs/df_cluster_feat_k=6_{timestamp}.csv")
+
+'''
+# %% 各クラスタの特徴量傾向を把握(曜日)
+# 件数集計
+ct = pd.crosstab(df["cluster"], df["weekday"])
+# 件数→割合（行方向に正規化）
+ct_pct = ct.div(ct.sum(axis=1), axis=0) 
+weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+ct_pct = ct_pct[weekday_order]
+print(ct_pct)
+
+
+#%%
+
+
 # %%
+'''
