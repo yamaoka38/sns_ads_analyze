@@ -210,12 +210,17 @@ X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad3_head_{
 X_train_arr = X_train_encoded_drop.to_numpy()
 
 # kの検証範囲を設定
-k_range = range(2, 11)
+k_list = [2, 4, 6, 7]
 
-# スコア格納リストを作成
-dbi_list, ch_list = [], []
+# 比較のためにPCAを1回実行
+pca = PCA(n_components=2, random_state=0)
+X_pca = pca.fit_transform(X_train_arr)
 
-for k in k_range:
+# %% グラフの描画領域を準備
+fig, axes = plt.subplots(2, 2, figsize=(8, 8), constrained_layout=True)
+
+# %%
+for ax, k in zip(axes.ravel(), k_list):
     # kmインスタンスを作成
     km = KMeans(n_clusters=k, init= "random", random_state=0, n_init="auto")
     # モデルの学習と予測を実行
@@ -227,120 +232,59 @@ for k in k_range:
     dbi = davies_bouldin_score(X_train_arr, Y_km)
     ch = calinski_harabasz_score(X_train_arr, Y_km)
 
-    dbi_list.append(dbi)
-    ch_list.append(ch)
-
     print(f"k={k} | DBI={dbi:.3f}, CH={ch:.1f}")
 
-# スコアをデータフレーム化
-score_df = pd.DataFrame({
-    "k": k_range,
-    "DBI": dbi_list,
-    "CH": ch_list
-})
+    # ============================================
+    # 2-3. クラスタリング毎の特徴量確認
+    # ============================================
+    # クラスタ番号をdfに結合
+    Y_km_s = pd.Series(Y_km, index=X_train_encoded.index, name="cluster")
+    df = X_train_encoded.join(Y_km_s)
+    df.head(10).to_csv(f"outputs/df_cluster_k=6_ad3_{timestamp}.csv")
 
-score_df.to_csv(f"outputs/clustering_ad_score_compare-k_{timestamp}.csv")
-
-# ベストスコアを確認
-best_k_dbi = score_df.loc[score_df["DBI"].idxmin(), "k"]
-best_k_ch = score_df.loc[score_df["CH"].idxmax(), "k"]
-print(f"・DBI最小 → DBI={score_df["DBI"].min()}, k={best_k_dbi}")
-print(f"・CH最大 → CH={score_df["CH"].max()}, k={best_k_ch}")
-
-# ============================================
-# 2-3. k数毎のスコアをグラフ化
-# ============================================
-# --- グラフ描画 ---
-fig, ax1 = plt.subplots(figsize=(8, 5))
-color_ch = "tab:blue"
-color_dbi = "tab:red"
-
-# CH（左軸）
-ax1.set_xlabel("k (number of clusters)")
-ax1.set_ylabel("Calinski-Harabasz (↑)", color=color_ch)
-ax1.plot(k_range, ch_list, marker="s", color=color_ch, label="CH (↑)")
-ax1.tick_params(axis="y", labelcolor=color_ch)
-
-# DBI（右軸）
-ax2 = ax1.twinx()  # 右軸を作成
-ax2.set_ylabel("Davies-Bouldin (↓)", color=color_dbi)
-ax2.plot(k_range, dbi_list, marker="o", color=color_dbi, label="DBI (↓)")
-ax2.tick_params(axis="y", labelcolor=color_dbi)
-
-# グラフタイトルと凡例
-fig.suptitle("DBI (↓) & CH (↑) by Cluster Number", fontsize=13)
-fig.tight_layout()
-plt.savefig(f"outputs/figures/kmeans_clusters_ad_compare_k_{timestamp}.png", dpi=300, bbox_inches="tight")
-plt.show()
-
-
-#%%
-'''
-# ============================================
-# 2-3. クラスタリング結果の可視化（グラフ）
-# ============================================
-
-# セントロイド（クラスタ中心）もPCA空間に変換
-centers_pca = pca.transform(km.cluster_centers_)
-
-# 散布図で可視化
-plt.figure(figsize=(6, 6))
-plt.scatter(X_pca[:, 0], X_pca[:, 1], c=Y_km, cmap='viridis', alpha=0.6)
-plt.scatter(centers_pca[:, 0], centers_pca[:, 1], 
-            c='red', s=200, marker='X', label='Centroids')
-plt.xlabel('PCA Component 1')
-plt.ylabel('PCA Component 2')
-plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
-plt.legend()
-plt.savefig(f'outputs/figures/kmeans_clusters_ad3_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
-plt.show()
-
-# ============================================
-# 2-4. クラスタリング結果の評価
-# ============================================
-# %% クラスタリングの評価
-# silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
-dbi = davies_bouldin_score(X_train_arr, Y_km)
-ch = calinski_harabasz_score(X_train_arr, Y_km)
-
-# print(f"Silhouette Score: {silhouette:.3f}")
-print(f"Davies-Bouldin Index: {dbi:.3f}")
-print(f"Calinski-Harabasz Index: {ch:.3f}")
-
-# ============================================
-# 2-5. クラスタリング毎の特徴量確認
-# ============================================
-# %% クラスタ番号をdfに結合
-Y_km_s = pd.Series(Y_km, index=X_train_encoded.index, name="cluster")
-df = X_train_encoded.join(Y_km_s)
-df.head(10).to_csv(f"outputs/df_cluster_k=6_ad3_{timestamp}.csv")
-
-# %% クラスタ毎のCTR・CVR・CTVRを計算
-agg = (
-    df
-    .groupby("cluster", dropna=False)
-    .agg(
-        impressions=("imp", "sum"),
-        clicks=("click", "sum"),
-        conversions=("Purchase", "sum")
+    # クラスタ毎のCTR・CVR・CTVRを計算
+    agg = (
+        df
+        .groupby("cluster", dropna=False)
+        .agg(
+            impressions=("imp", "sum"),
+            clicks=("click", "sum"),
+            conversions=("Purchase", "sum")
+        )
     )
-)
 
-agg["CTR"] = np.where(agg["impressions"] > 0,
-                      agg["clicks"] / agg["impressions"], np.nan)
-agg["CVR"] = np.where(agg["clicks"] > 0,
-                      agg["conversions"] / agg["clicks"], np.nan)
-agg["CTVR"] = np.where(agg["impressions"] > 0,
-                      agg["CTR"] * agg["CVR"]*100, np.nan)
-print(agg.reset_index())
-print(agg)
+    agg["CTR"] = np.where(agg["impressions"] > 0,
+                        agg["clicks"] / agg["impressions"], np.nan)
+    agg["CVR"] = np.where(agg["clicks"] > 0,
+                        agg["conversions"] / agg["clicks"], np.nan)
+    agg["CTVR"] = np.where(agg["impressions"] > 0,
+                        agg["CTR"] * agg["CVR"]*100, np.nan)
+    print(agg.reset_index())
+    print(agg)
 
-# %% 各クラスタの特徴量傾向を把握(数値の平均値)
-cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
-print(cluster_summary)
+    # %% 各クラスタの特徴量傾向を把握(数値の平均値)
+    cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
+    print(cluster_summary)
 
-# %% 全出力をマージ
-df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
-print(df_cluster_feat)
-df_cluster_feat.to_csv(f"outputs/df_cluster_ad3_feat_k=6_{timestamp}.csv")
-'''
+    # %% 全出力をマージ
+    df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
+    print(df_cluster_feat)
+    df_cluster_feat.to_csv(f"outputs/df_cluster_ad3_feat_k={k}_{timestamp}.csv")
+
+
+    # ============================================
+    # 2-4. クラスタリング結果の可視化（グラフ）
+    # ============================================
+    # 散布図を作成
+    sc = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=Y_km, cmap="tab10", s=10, alpha=0.8)
+    ax.set_title(f"k={k} | DBI={dbi:.3f} ↓  CH={ch:.1f} ↑")
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")  
+
+plt.suptitle("PCA Scatter by k (KMeans, common PCA space)", y=1.03, fontsize=12)
+plt.savefig(f"outputs/figures/lcustering_ad_kmeans_pca_k2_4_6_7_{timestamp}.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+
+
+
