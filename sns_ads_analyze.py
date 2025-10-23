@@ -105,13 +105,41 @@ test_all = df_merged.loc[test_idx].reset_index(drop=True)
 
 # %%  クラスタリングに使用するカラムを選択
 use_cols = [
-"ad_platform","ad_type",
+"ad_id","ad_platform","ad_type",
 "target_gender","target_age_group","target_interests","duration_days","total_budget",
 "Purchase","imp","click"
 ]
 X_train_s = train_all[use_cols]
 X_train = X_train_s.copy()
 
+print(X_train.head(5))
+
+# %% ad_id毎の平均CTR・CVRを計算
+ad_stats = (
+    X_train.groupby("ad_id")
+    .agg(
+        avg_ctr=("click", lambda x: x.sum() / X_train.loc[x.index, "imp"].sum()),
+        avg_cvr=("Purchase", lambda x: x.sum() / X_train.loc[x.index, "click"].sum())
+    )
+    .reset_index()
+)
+
+X_train = X_train.merge(ad_stats, on="ad_id", how="left")
+
+# ここで算出した平均CTR・CVRを特徴量としてテストデータにも反映
+test_all = test_all.merge(ad_stats, on="ad_id", how="left")
+# テストに存在する新しい ad_id は平均値で補完
+test_all[["avg_ctr", "avg_cvr"]] = test_all[["avg_ctr", "avg_cvr"]].fillna(ad_stats[["avg_ctr", "avg_cvr"]].mean())
+#%%
+'''
+# 処理結果確認
+print(f"ad_stats:{ad_stats.head(10)}")
+print(f"X_train：{X_train.head(10)}")
+print(f"test_all:{test_all.head(10)}")
+ad_stats.head(30).to_csv(f"outputs/ad_stats_ctrcvr_head30_{timestamp}.csv")
+X_train.head(30).to_csv(f"outputs/X_train_ctrcvr_head30_{timestamp}.csv")
+test_all.head(30).to_csv(f"outputs/test_all_ctrcvr_head30_{timestamp}.csv")
+'''
 #%%
 #print(X_train.head(5))
 #X_train.head(30).to_csv(f"outputs/X_train_adfeat_{timestamp}.csv")
@@ -152,19 +180,19 @@ print(f'ワンホットエンコーディング結果：{X_train_encoded.head(10
 
 # %% imp/click/purchaseを削除
 X_train_encoded_drop = X_train_encoded.copy()
-X_train_encoded_drop = X_train_encoded_drop.drop(["Purchase","imp","click","art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"], axis=1)
+X_train_encoded_drop = X_train_encoded_drop.drop(["ad_id","Purchase","imp","click","art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"], axis=1)
 print(f"drop前:{X_train_encoded.head(5)}")
 print(f"drop後:{X_train_encoded_drop.head(5)}")
 
 # %% 数値特徴量 を標準化
 scaler = StandardScaler()
-num_cols = ["duration_days","total_budget"]
+num_cols = ["duration_days","total_budget","avg_ctr","avg_cvr"]
 X_train_encoded_drop[num_cols] = scaler.fit_transform(X_train_encoded_drop[num_cols])
 print(f"標準化後：{X_train_encoded_drop.head(10)}")
 
 #%%
 # %% 前処理後のデータをCSVで確認
-X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad2_head_{timestamp}.csv")
+X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad3_head_{timestamp}.csv")
 
 
 # %% 訓練データをdfからarrayに変換
@@ -196,7 +224,7 @@ plt.xlabel('PCA Component 1')
 plt.ylabel('PCA Component 2')
 plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
 plt.legend()
-plt.savefig(f'outputs/figures/kmeans_clusters_ad2_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'outputs/figures/kmeans_clusters_ad3_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # %% クラスタリングの評価
@@ -211,7 +239,7 @@ print(f"Calinski-Harabasz Index: {ch:.3f}")
 # %% クラスタ番号をdfに結合
 Y_km_s = pd.Series(Y_km, index=X_train_encoded.index, name="cluster")
 df = X_train_encoded.join(Y_km_s)
-df.head(10).to_csv(f"outputs/df_cluster_k=6_ad2_{timestamp}.csv")
+df.head(10).to_csv(f"outputs/df_cluster_k=6_ad3_{timestamp}.csv")
 
 # %% クラスタ毎のCTR・CVR・CTVRを計算
 agg = (
@@ -240,5 +268,5 @@ print(cluster_summary)
 # %% 全出力をマージ
 df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
 print(df_cluster_feat)
-df_cluster_feat.to_csv(f"outputs/df_cluster_ad2_feat_k=6_{timestamp}.csv")
+df_cluster_feat.to_csv(f"outputs/df_cluster_ad3_feat_k=6_{timestamp}.csv")
 
