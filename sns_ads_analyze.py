@@ -1,5 +1,5 @@
 ########################################################
-#  事前準備（データの読み込みと確認）
+#  0. 事前準備（データの読み込みと確認）
 ########################################################
 
 # %% 必要なモジュールのインポート
@@ -58,8 +58,11 @@ df_merged = pd.merge(df_merged, df_users, on='user_id', how='left')
 df_merged = pd.get_dummies(df_merged,columns=['event_type'],dtype=int)
 
 ########################################################
-# 前処理（分割前）
+# 1. 前処理（分割前）
 ########################################################
+# ============================================
+# 1-1. 目的変数の処理
+# ============================================
 
 # 目的変数の処理
 # %% imp列を追加（すべての値を1にする）
@@ -71,7 +74,9 @@ df_merged = df_merged.rename(columns={"event_type_Purchase":"Purchase"})
 # %% Engagement列を追加
 df_merged["engagement"] = np.where((df_merged["event_type_Comment"]==1) |(df_merged["event_type_Like"]==1) |(df_merged["event_type_Share"]==1), 1, 0)
 
-
+# ============================================
+# 1-2. 特徴量の処理
+# ============================================
 # %% timestampから月・日・開始日からの経過日数カラムと時間カラムを作成
 df_merged["timestamp"] = pd.to_datetime(df_merged["timestamp"]) # timestampをdatetime型に変換
 df_merged["month"] = df_merged["timestamp"].dt.month
@@ -91,6 +96,9 @@ df_interests = df_merged["interests_list"].explode().str.strip().str.get_dummies
 ## 元のdfに結合
 df_merged = pd.concat([df_merged, df_interests], axis=1)
 
+# ============================================
+# 1-3. 学習データとテストデータの分割
+# ============================================
 # %% データを学習データとテストデータに分割
 ## まずは目的変数を設定せずに、Clickの比率を維持したまま分割
 train_idx, test_idx = train_test_split(df_merged.index,test_size=0.2, random_state=0, stratify=df_merged["click"])
@@ -100,9 +108,11 @@ test_all = df_merged.loc[test_idx].reset_index(drop=True)
 
 
 ########################################################
-# ユーザー指標でクラスタリング
+# 2. 広告特徴量でクラスタリング
 ########################################################
-
+# ============================================
+# 2-1. 前処理
+# ============================================
 # %%  クラスタリングに使用するカラムを選択
 use_cols = [
 "ad_id","ad_platform","ad_type",
@@ -114,6 +124,7 @@ X_train = X_train_s.copy()
 
 print(X_train.head(5))
 
+# --- 平均CTR・CVRの追加
 # %% ad_id毎の平均CTR・CVRを計算
 ad_stats = (
     X_train.groupby("ad_id")
@@ -148,7 +159,8 @@ test_all.head(30).to_csv(f"outputs/test_all_ctrcvr_head30_{timestamp}.csv")
 #print(X_train["target_interests"].unique())
 #X_train["target_interests"].to_csv(f"outputs/X_train_tinterests_{timestamp}.csv")
 
-#%% target_interests を変換
+
+# %% --- target_interestsを変換
 ## カンマ区切りをリストに変換
 X_train["t_interests_list"] = X_train["target_interests"].str.split(",")
 ## リストをワンホットエンコーディング
@@ -169,48 +181,104 @@ print("pca.explained_variance_ratio_")
 print(pca.explained_variance_ratio_)
 X_train.head(30).to_csv(f"outputs/X_train_pca_head30_{timestamp}.csv")
 
-#%%
-
-
-# %% カテゴリカル変数をワンホットエンコーディング
+# %% --- カテゴリカル変数をワンホットエンコーディング
 cat_cols = ["ad_platform","ad_type","target_gender","target_age_group"]
 X_train_encoded = pd.get_dummies(X_train, columns=cat_cols, drop_first=False, dtype=int)
 print(f'ワンホットエンコーディング結果：{X_train_encoded.head(10)}')
 #X_train_encoded.head(30).to_csv(f"outputs/X_train_adfeat_caten_{timestamp}.csv")
 
-# %% imp/click/purchaseを削除
+# %% --- 不要な列を削除
 X_train_encoded_drop = X_train_encoded.copy()
 X_train_encoded_drop = X_train_encoded_drop.drop(["ad_id","Purchase","imp","click","art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"], axis=1)
 print(f"drop前:{X_train_encoded.head(5)}")
 print(f"drop後:{X_train_encoded_drop.head(5)}")
 
-# %% 数値特徴量 を標準化
+# %% --- 数値特徴量 を標準化
 scaler = StandardScaler()
 num_cols = ["duration_days","total_budget","avg_ctr","avg_cvr"]
 X_train_encoded_drop[num_cols] = scaler.fit_transform(X_train_encoded_drop[num_cols])
 print(f"標準化後：{X_train_encoded_drop.head(10)}")
 
-#%%
 # %% 前処理後のデータをCSVで確認
 X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad3_head_{timestamp}.csv")
 
+# ============================================
+# 2-2. クラスタリング実施(k数の検証)
+# ============================================
 
 # %% 訓練データをdfからarrayに変換
 X_train_arr = X_train_encoded_drop.to_numpy()
 
-# kを6に設定
-k = 6
+# kの検証範囲を設定
+k_range = range(2, 11)
 
-# kmインスタンスを作成
-km = KMeans(n_clusters=k, init= "random", random_state=0, n_init='auto')
-# モデルの学習と予測を実行
-Y_km = km.fit_predict(X_train_arr)
-print(Y_km)
+# スコア格納リストを作成
+dbi_list, ch_list = [], []
 
-# %%
-# PCAで特徴量を2次元に圧縮
-pca = PCA(n_components=2, random_state=0)
-X_pca = pca.fit_transform(X_train_arr)
+for k in k_range:
+    # kmインスタンスを作成
+    km = KMeans(n_clusters=k, init= "random", random_state=0, n_init="auto")
+    # モデルの学習と予測を実行
+    Y_km = km.fit_predict(X_train_arr)
+    print(Y_km)
+
+    # クラスタリングの評価
+    # silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
+    dbi = davies_bouldin_score(X_train_arr, Y_km)
+    ch = calinski_harabasz_score(X_train_arr, Y_km)
+
+    dbi_list.append(dbi)
+    ch_list.append(ch)
+
+    print(f"k={k} | DBI={dbi:.3f}, CH={ch:.1f}")
+
+# スコアをデータフレーム化
+score_df = pd.DataFrame({
+    "k": k_range,
+    "DBI": dbi_list,
+    "CH": ch_list
+})
+
+score_df.to_csv(f"outputs/clustering_ad_score_compare-k_{timestamp}.csv")
+
+# ベストスコアを確認
+best_k_dbi = score_df.loc[score_df["DBI"].idxmin(), "k"]
+best_k_ch = score_df.loc[score_df["CH"].idxmax(), "k"]
+print(f"・DBI最小 → DBI={score_df["DBI"].min()}, k={best_k_dbi}")
+print(f"・CH最大 → CH={score_df["CH"].max()}, k={best_k_ch}")
+
+# ============================================
+# 2-3. k数毎のスコアをグラフ化
+# ============================================
+# --- グラフ描画 ---
+fig, ax1 = plt.subplots(figsize=(8, 5))
+color_ch = "tab:blue"
+color_dbi = "tab:red"
+
+# CH（左軸）
+ax1.set_xlabel("k (number of clusters)")
+ax1.set_ylabel("Calinski-Harabasz (↑)", color=color_ch)
+ax1.plot(k_range, ch_list, marker="s", color=color_ch, label="CH (↑)")
+ax1.tick_params(axis="y", labelcolor=color_ch)
+
+# DBI（右軸）
+ax2 = ax1.twinx()  # 右軸を作成
+ax2.set_ylabel("Davies-Bouldin (↓)", color=color_dbi)
+ax2.plot(k_range, dbi_list, marker="o", color=color_dbi, label="DBI (↓)")
+ax2.tick_params(axis="y", labelcolor=color_dbi)
+
+# グラフタイトルと凡例
+fig.suptitle("DBI (↓) & CH (↑) by Cluster Number", fontsize=13)
+fig.tight_layout()
+plt.savefig(f"outputs/figures/kmeans_clusters_ad_compare_k_{timestamp}.png", dpi=300, bbox_inches="tight")
+plt.show()
+
+
+#%%
+'''
+# ============================================
+# 2-3. クラスタリング結果の可視化（グラフ）
+# ============================================
 
 # セントロイド（クラスタ中心）もPCA空間に変換
 centers_pca = pca.transform(km.cluster_centers_)
@@ -227,6 +295,9 @@ plt.legend()
 plt.savefig(f'outputs/figures/kmeans_clusters_ad3_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
 plt.show()
 
+# ============================================
+# 2-4. クラスタリング結果の評価
+# ============================================
 # %% クラスタリングの評価
 # silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
 dbi = davies_bouldin_score(X_train_arr, Y_km)
@@ -236,6 +307,9 @@ ch = calinski_harabasz_score(X_train_arr, Y_km)
 print(f"Davies-Bouldin Index: {dbi:.3f}")
 print(f"Calinski-Harabasz Index: {ch:.3f}")
 
+# ============================================
+# 2-5. クラスタリング毎の特徴量確認
+# ============================================
 # %% クラスタ番号をdfに結合
 Y_km_s = pd.Series(Y_km, index=X_train_encoded.index, name="cluster")
 df = X_train_encoded.join(Y_km_s)
@@ -269,4 +343,4 @@ print(cluster_summary)
 df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
 print(df_cluster_feat)
 df_cluster_feat.to_csv(f"outputs/df_cluster_ad3_feat_k=6_{timestamp}.csv")
-
+'''
