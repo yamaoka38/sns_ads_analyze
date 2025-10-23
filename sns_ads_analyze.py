@@ -210,14 +210,14 @@ X_train_encoded_drop.head(1000).to_csv(f"outputs/X_train_encoded_drop_ad3_head_{
 X_train_arr = X_train_encoded_drop.to_numpy()
 
 # kの検証範囲を設定
-k_list = [2, 4, 6, 7]
+k_list = [5, 6]
 
 # 比較のためにPCAを1回実行
 pca = PCA(n_components=2, random_state=0)
 X_pca = pca.fit_transform(X_train_arr)
 
 # %% グラフの描画領域を準備
-fig, axes = plt.subplots(2, 2, figsize=(8, 8), constrained_layout=True)
+fig, axes = plt.subplots(1, 2, figsize=(10, 5), constrained_layout=True)
 
 # %%
 for ax, k in zip(axes.ravel(), k_list):
