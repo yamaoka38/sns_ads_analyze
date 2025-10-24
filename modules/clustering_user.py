@@ -161,7 +161,7 @@ plt.xlabel('PCA Component 1')
 plt.ylabel('PCA Component 2')
 plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
 plt.legend()
-plt.savefig(f'../outputs/figures/kmeans_clustering_user_k={k}_{timestamp}.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'../outputs/push/figures/kmeans_clustering_user_k={k}_{timestamp}.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # ============================================
@@ -235,7 +235,7 @@ drop_list = ["hour_sin","hour_cos","Purchase","imp","click","weekday_sin","weekd
 df_cluster_feat_drop = df_cluster_feat.copy()
 df_cluster_feat_drop = df_cluster_feat_drop.drop(columns=drop_list,axis=1)
 print(df_cluster_feat_drop)
-df_cluster_feat_drop.to_csv(f"../outputs/df_clustering_user_feat_k={k}_{timestamp}.csv")
+df_cluster_feat_drop.to_csv(f"../outputs/push/df_clustering_user_feat_k={k}_{timestamp}.csv")
 # %%
 
 # ============================================

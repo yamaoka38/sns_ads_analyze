@@ -196,7 +196,7 @@ plt.xlabel('PCA Component 1')
 plt.ylabel('PCA Component 2')
 plt.title('K-means Clusters_ad_v1_ (PCA 2D Projection)')
 plt.legend()
-plt.savefig(f'../outputs/figures/kmeans_clustering_ad_k={k}_{timestamp}.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'../outputs/push/figures/kmeans_clustering_ad_k={k}_{timestamp}.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # ============================================
@@ -234,7 +234,7 @@ print(cluster_summary)
 # %% 全出力をマージ
 df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
 print(df_cluster_feat)
-df_cluster_feat.to_csv(f"../outputs/df_clustering_ad_feat_k={k}_{timestamp}.csv")
+df_cluster_feat.to_csv(f"../outputs/push/df_clustering_ad_feat_k={k}_{timestamp}.csv")
 
 
 # ============================================
