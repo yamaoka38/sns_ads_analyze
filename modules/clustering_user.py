@@ -1,10 +1,13 @@
 ########################################################
-#  事前準備（データの読み込みと確認）
+# 0. 事前準備（データの読み込みと確認）
 ########################################################
 
 # %% 必要なモジュールのインポート
+import yaml
 from tkinter.constants import X
 from datetime import datetime
+from pathlib import Path
+import re
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -20,86 +23,33 @@ import matplotlib.pyplot as plt
 timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 print(timestamp)
 
-# %%  データセットの読み込み
-df_events = pd.read_csv('rawdata/ad_events.csv')
-df_ads = pd.read_csv('rawdata/ads.csv')
-df_cps = pd.read_csv('rawdata/campaigns.csv')
-df_users = pd.read_csv('rawdata/users.csv')
+# %% yamlを読み込み
+with open("../hub/config.yaml", "r", encoding="utf-8") as f:
+    cfg = yaml.safe_load(f)
 
-# 読み込みデータの確認
-print(f'df_events:{df_events.head(5)}')
-print(f'df_ads:{df_ads.head(5)}')
-print(f'df_cps:{df_cps.head(5)}')
-print(f'df_users:{df_users.head(5)}')
+# %% --- 学習データを読み込み
+# 出力フォルダを指定
+output_dir = Path("../outputs")
 
-# %% # データの中身を確認する関数を定義
-def check_data(df):
-    print('上位10件')
-    print(df.head(10))
-    print()
-    print('データの形状')
-    print(df.shape)
-    print('データ型')
-    print(df.dtypes)
-    print()
-    print('基本統計量(数値)')
-    print(df.describe())
-    print('基本統計量(カテゴリカル変数)')
-    print(df.describe(exclude='number'))
-    print()
+# ファイル名のパターン（例：user_clusters_20251024_1530.csv）
+pattern = re.compile(r"df_train_all_\d{8}_\d{4}\.csv$")
 
-# %% 全データをマージ
-df_merged = pd.merge(df_events, df_ads, on='ad_id', how='left')
-df_merged = pd.merge(df_merged, df_cps, on='campaign_id', how='left')
-df_merged = pd.merge(df_merged, df_users, on='user_id', how='left')
+# フォルダ内のファイルを検索 → パターンに一致するものだけ取得
+files = sorted([f for f in output_dir.glob("df_train_all_*.csv") if pattern.search(f.name)])
 
-# %% event_typeをワンホットエンコーディングで各カラムに変換
-df_merged = pd.get_dummies(df_merged,columns=['event_type'],dtype=int)
+# ファイルが見つからなかった場合はエラー
+if not files:
+    raise FileNotFoundError("df_train_all_YYYYMMDD_HHMM.csv の形式に合うファイルが見つかりません。")
+
+# 最新ファイルを選択（ファイル名昇順の最後＝最新）
+latest_file = files[-1]
+print(f"読み込み対象ファイル: {latest_file.name}")
+
+# CSVを読み込み
+train_all = pd.read_csv(latest_file)
 
 ########################################################
-# 前処理（分割前）
-########################################################
-
-# 目的変数の処理
-# %% imp列を追加（すべての値を1にする）
-df_merged["imp"] = 1
-# %% click列を追加（Purchase or event_type_clickが1の時、1を入れる。その他は0）
-df_merged["click"] = np.where((df_merged["event_type_Click"] ==1) |(df_merged["event_type_Purchase"] ==1), 1, 0)
-# %% Purchaseの列名を変更
-df_merged = df_merged.rename(columns={"event_type_Purchase":"Purchase"})
-# %% Engagement列を追加
-df_merged["engagement"] = np.where((df_merged["event_type_Comment"]==1) |(df_merged["event_type_Like"]==1) |(df_merged["event_type_Share"]==1), 1, 0)
-
-
-# %% timestampから月・日・開始日からの経過日数カラムと時間カラムを作成
-df_merged["timestamp"] = pd.to_datetime(df_merged["timestamp"]) # timestampをdatetime型に変換
-df_merged["month"] = df_merged["timestamp"].dt.month
-df_merged["day"] = df_merged["timestamp"].dt.day
-df_merged["day_from_start"] = (df_merged["timestamp"] - df_merged["timestamp"].min()) .dt.days
-df_merged["hour"] = df_merged["timestamp"].dt.hour
-
-## hourについて23時と0時を遠いと判断させないために、周期性を持たせる
-df_merged["hour_sin"] = np.sin(2*np.pi*df_merged["hour"]/24)
-df_merged["hour_cos"] = np.cos(2*np.pi*df_merged["hour"]/24)
-
-# %% interestを変換
-## カンマ区切りをリストに変換
-df_merged["interests_list"] = df_merged["interests"].str.split(",")
-## リストをワンホットエンコーディング
-df_interests = df_merged["interests_list"].explode().str.strip().str.get_dummies().groupby(level=0).sum()
-## 元のdfに結合
-df_merged = pd.concat([df_merged, df_interests], axis=1)
-
-# %% データを学習データとテストデータに分割
-## まずは目的変数を設定せずに、Clickの比率を維持したまま分割
-train_idx, test_idx = train_test_split(df_merged.index,test_size=0.2, random_state=0, stratify=df_merged["click"])
-
-train_all = df_merged.loc[train_idx].reset_index(drop=True)
-test_all = df_merged.loc[test_idx].reset_index(drop=True)
-
-
-########################################################
-# ユーザー指標でクラスタリング
+# 1. 前処理
 ########################################################
 
 # %%  クラスタリングに使用するカラムを選択
@@ -154,20 +104,27 @@ print(f'年齢標準偏差：{std_age}')
 
 print(X_train_encoded.head(5))
 
-# %% データをCSVで確認
-# X_train_encoded.head(1000).to_csv("outputs/X_train_encoded_user_3_head1000.csv")
+# %% 前処理データをCSVで確認
+X_train_encoded.head(100).to_csv(f"../outputs/df_X_train_encoded_user_pretreatment_head100_{timestamp}.csv")
 
 X_train_encoded_drop = X_train_encoded.copy()
 X_train_encoded_drop = X_train_encoded_drop.drop(["Purchase","imp","click"], axis=1)
+
 print(X_train_encoded.head(5))
 print(X_train_encoded_drop.head(5))
 
-
+########################################################
+# 2. クラスタリング
+########################################################
+# ============================================
+# 2-1. クラスタリング実施
+# ============================================
 # %% 訓練データをdfからarrayに変換
 X_train_arr = X_train_encoded_drop.to_numpy()
 
 # kを6に設定
-k = 6
+k = cfg["clustering"]["user_k"]
+print(f"k:{k}")
 
 # kmインスタンスを作成
 km = KMeans(n_clusters=k, init= "random", random_state=0, n_init='auto')
@@ -175,25 +132,6 @@ km = KMeans(n_clusters=k, init= "random", random_state=0, n_init='auto')
 Y_km = km.fit_predict(X_train_arr)
 print(Y_km)
 
-# %%
-# PCAで特徴量を2次元に圧縮
-pca = PCA(n_components=2, random_state=0)
-X_pca = pca.fit_transform(X_train_arr)
-
-# セントロイド（クラスタ中心）もPCA空間に変換
-centers_pca = pca.transform(km.cluster_centers_)
-
-# 散布図で可視化
-plt.figure(figsize=(6, 6))
-plt.scatter(X_pca[:, 0], X_pca[:, 1], c=Y_km, cmap='viridis', alpha=0.6)
-plt.scatter(centers_pca[:, 0], centers_pca[:, 1], 
-            c='red', s=200, marker='X', label='Centroids')
-plt.xlabel('PCA Component 1')
-plt.ylabel('PCA Component 2')
-plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
-plt.legend()
-plt.savefig(f'outputs/figures/kmeans_clusters_user_k=6_{timestamp}.png', dpi=300, bbox_inches='tight')
-plt.show()
 
 # %% クラスタリングの評価
 # silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
@@ -204,10 +142,35 @@ ch = calinski_harabasz_score(X_train_arr, Y_km)
 print(f"Davies-Bouldin Index: {dbi:.3f}")
 print(f"Calinski-Harabasz Index: {ch:.3f}")
 
+# ============================================
+# 2-2. 2次元散布図で可視化
+# ============================================
+# %% PCAで特徴量を2次元に圧縮
+pca = PCA(n_components=2, random_state=0)
+X_pca = pca.fit_transform(X_train_arr)
+
+# セントロイド（クラスタ中心）もPCA空間に変換
+centers_pca = pca.transform(km.cluster_centers_)
+
+# 散布図で可視化
+plt.figure(figsize=(6, 6))
+plt.scatter(X_pca[:, 0], X_pca[:, 1], c=Y_km, cmap="tab10", alpha=0.6)
+plt.scatter(centers_pca[:, 0], centers_pca[:, 1], 
+            c='red', s=200, marker='X', label='Centroids')
+plt.xlabel('PCA Component 1')
+plt.ylabel('PCA Component 2')
+plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
+plt.legend()
+plt.savefig(f'../outputs/figures/kmeans_clustering_user_k={k}_{timestamp}.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+# ============================================
+# 2-3. クラスタごとの特徴量を可視化
+# ============================================
 # %% クラスタ番号をdf1に結合
 Y_km_s = pd.Series(Y_km, index=X_train_encoded.index, name="cluster")
 df = X_train_encoded.join(Y_km_s)
-df.head(10).to_csv(f"outputs/df_cluster_k=6_{timestamp}.csv")
+df.head(100).to_csv(f"../outputs/df_X_train_add_user_clustering_id_k={k}_head100_{timestamp}.csv")
 
 # %% 年齢を元に戻す（手計算）
 df["user_age"] = df["user_age"] * std_age + mean_age
@@ -272,5 +235,13 @@ drop_list = ["hour_sin","hour_cos","Purchase","imp","click","weekday_sin","weekd
 df_cluster_feat_drop = df_cluster_feat.copy()
 df_cluster_feat_drop = df_cluster_feat_drop.drop(columns=drop_list,axis=1)
 print(df_cluster_feat_drop)
-df_cluster_feat_drop.to_csv(f"outputs/df_cluster_feat_k=6_{timestamp}.csv")
+df_cluster_feat_drop.to_csv(f"../outputs/df_clustering_user_feat_k={k}_{timestamp}.csv")
 # %%
+
+# ============================================
+# 2-4. ユーザークラスタIDを元データに結合
+# ============================================
+# %% クラスタ番号をtrain_allに結合
+Y_km_s = pd.Series(Y_km, index=train_all.index, name="user_cluster_id")
+df_add_id = train_all.join(Y_km_s)
+df_add_id.to_csv(f"../outputs/df_train_all_user_cluster_id_{timestamp}.csv")

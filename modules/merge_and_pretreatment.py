@@ -1,20 +1,29 @@
 ########################################################
-#  事前準備（データの読み込みと確認）
+# 0. 事前準備（データの読み込みと確認）
 ########################################################
 
 # %% 必要なモジュールのインポート
-from tkinter.constants import X
+import yaml
+from datetime import datetime
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+# %%  タイムスタンプを取得
+timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+print(timestamp)
+
+# %% yamlを読み込み
+with open("../hub/config.yaml", "r", encoding="utf-8") as f:
+    cfg = yaml.safe_load(f)
+
 # %%  データセットの読み込み
-df_events = pd.read_csv('rawdata/ad_events.csv')
-df_ads = pd.read_csv('rawdata/ads.csv')
-df_cps = pd.read_csv('rawdata/campaigns.csv')
-df_users = pd.read_csv('rawdata/users.csv')
+df_events = pd.read_csv(cfg["rawdata"]["event_path"])
+df_ads = pd.read_csv(cfg["rawdata"]["ads_path"])
+df_cps = pd.read_csv(cfg["rawdata"]["cps_path"])
+df_users = pd.read_csv(cfg["rawdata"]["users_path"])
 
 # 読み込みデータの確認
 print(f'df_events:{df_events.head(5)}')
@@ -48,33 +57,29 @@ check_data(df_merged)
 df_merged = pd.get_dummies(df_merged,columns=['event_type'],dtype=int)
 
 ########################################################
-# 前処理（分割前）
+# 1. 前処理（分割前）
 ########################################################
-
-# 目的変数の処理
+# ============================================
+# 1-1. 目的変数の処理
+# ============================================
 # %% imp列を追加（すべての値を1にする）
 df_merged["imp"] = 1
-print(df_merged[["event_type_Impression","imp"]].head(50) )
-print(df_merged[["event_type_Impression","imp"]].describe(),"\n")
 
 # %% click列を追加（Purchase or event_type_clickが1の時、1を入れる。その他は0）
 df_merged["click"] = np.where((df_merged["event_type_Click"] ==1) |(df_merged["event_type_Purchase"] ==1), 1, 0)
-print(df_merged[["event_type_Click","event_type_Purchase","click"]].head(30),"\n")
-print(df_merged[["event_type_Click","event_type_Purchase","click"]].describe(),"\n")
-print(df_merged[["imp","event_type_Click","event_type_Purchase","click"]].sum(),"\n")
 
 # %% Purchaseの列名を変更
 df_merged = df_merged.rename(columns={"event_type_Purchase":"Purchase"})
 
 # %% Engagement列を追加
 df_merged["engagement"] = np.where((df_merged["event_type_Comment"]==1) |(df_merged["event_type_Like"]==1) |(df_merged["event_type_Share"]==1), 1, 0)
-print(df_merged[["event_type_Comment","event_type_Like","event_type_Share","engagement"]].head(30),"\n")
-print(df_merged[["event_type_Comment","event_type_Like","event_type_Share","engagement"]].describe(),"\n")
-print(df_merged[["event_type_Comment","event_type_Like","event_type_Share","engagement"]].sum(),"\n")
 
 # %% CSVでdfを確認
-df_merged.head(100).to_csv('outputs/df_merged_event_pre_head100.csv')
+# df_merged.head(100).to_csv(f"../outputs/df_merged_pre_event_chk_head100_{timestamp}.csv")
 
+# ============================================
+# 1-2. 特徴量の処理
+# ============================================
 # %% timestampから月・日・開始日からの経過日数カラムと時間カラムを作成
 df_merged["timestamp"] = pd.to_datetime(df_merged["timestamp"]) # timestampをdatetime型に変換
 df_merged["month"] = df_merged["timestamp"].dt.month
@@ -91,7 +96,7 @@ print(df_merged[["timestamp","month","day","day_from_start","hour","hour_sin","h
 print(df_merged[["timestamp","month","day","day_from_start","hour","hour_sin","hour_cos"]].head(10),"\n")
 
 
-# %% interestを変換
+# %% --- interestを変換
 ## カンマ区切りをリストに変換
 df_merged["interests_list"] = df_merged["interests"].str.split(",")
 ## print(df_merged["interests_list"].head(10))
@@ -103,22 +108,27 @@ print(df_interests.head(10))
 df_merged = pd.concat([df_merged, df_interests], axis=1)
 print(df_merged.head(10))
 
-# %% CSVでdfを確認
-df_merged.head(100).to_csv('outputs/df_merged_feature_pre_head100.csv')
+# %% CSVに前処理後のdfを格納
+df_merged.to_csv(f"../outputs/df_merged_pretreatment_{timestamp}.csv")
 
-
-# %% データを学習データとテストデータに分割
-## まずは目的変数を設定せずに、Clickの比率を維持したまま分割
+# ============================================
+# 1-3. 学習データとテストデータの分割
+# ============================================
+# %% 目的変数を設定せずに、Clickの比率を維持したまま分割
 train_idx, test_idx = train_test_split(df_merged.index,test_size=0.2, random_state=0, stratify=df_merged["click"])
 
 train_all = df_merged.loc[train_idx].reset_index(drop=True)
 test_all = df_merged.loc[test_idx].reset_index(drop=True)
 
-# %% 
-print('train_all')
-check_data(train_all)
 
-# %%
-print('test_all')
-check_data(test_all)
-# %%
+# %% 分割結果・確認データをCSVに保存
+train_all.to_csv(f"../outputs/df_train_all_{timestamp}.csv")
+test_all.to_csv(f"../outputs/df_test_all_{timestamp}.csv")
+
+train_all.describe().to_csv(f"../outputs/chk_num_train_all_{timestamp}.csv")
+train_all.describe(exclude='number').to_csv(f"../outputs/chk_cat_train_all_{timestamp}.csv")
+
+test_all.describe().to_csv(f"../outputs/chk_num_test_all_{timestamp}.csv")
+test_all.describe(exclude='number').to_csv(f"../outputs/chk_cat_test_all_{timestamp}.csv")
+
+

@@ -1,0 +1,20 @@
+rawdata:
+  event_path: ../rawdata/ad_events.csv
+  ads_path: ../rawdata/ads.csv
+  cps_path: ../rawdata/campaigns.csv
+  users_path: ../rawdata/users.csv
+
+# memo
+output:
+  df_merged: ../outputs/df_merged_pretreatment_{timestamp}.csv
+  train_all: ../outputs/df_train_all_{timestamp}.csv
+  test_all: ../outputs/df_test_all_{timestamp}.csv
+  train_all_add_user_cluster_id: ../outputs/df_train_all_user_cluster_id_{timestamp}.csv
+  train_all_add_user-and-ad_cluster_id: ../outputs/df_train_all_user-ad_cluster_id_{timestamp}.csv
+
+
+clustering:
+  user_k: 6
+  ad_k: 5
+  random_state: 0
+  scaler: StandardScaler
