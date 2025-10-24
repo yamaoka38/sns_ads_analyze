@@ -208,8 +208,6 @@ __marimo__/
 
 # add
 ignores/
-ignores/**
-outputs/
 outputs/**
 
 # push対象にする
