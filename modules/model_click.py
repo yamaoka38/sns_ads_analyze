@@ -86,7 +86,17 @@ train_all.columns.to_series().to_csv(f"../outputs/train_all_columnslist.csv")
 # ============================================
 # 1-1. 訓練データに広告IDの平均CTR・CVRを追加
 # ============================================
+ad_stats = (
+    train_all.groupby("ad_id")
+    .agg(
+        avg_ctr=("click", lambda x: x.sum() / train_all.loc[x.index, "imp"].sum()),
+        avg_cvr=("Purchase", lambda x: x.sum() / train_all.loc[x.index, "click"].sum())
+    )
+    .reset_index()
+)
 
+train_all = train_all.merge(ad_stats, on="ad_id", how="left")
+print(train_all.head(10))
 
 
 # ============================================
@@ -94,8 +104,37 @@ train_all.columns.to_series().to_csv(f"../outputs/train_all_columnslist.csv")
 # ============================================
 
 use_cols=[
-    "ad_platform","ad_type","user_gender","user_age",
-    "click","hour_sin","hour_cos","user_cluster_id","ad_cluster_id"
+"day_of_week",
+"ad_platform",
+"ad_type",
+"target_gender",
+"target_interests",
+"duration_days",
+"total_budget",
+"user_gender",
+"user_age",
+"click",
+"month",
+"day",
+"day_from_start",
+"hour_sin",
+"hour_cos",
+"art",
+"fashion",
+"finance",
+"fitness",
+"food",
+"gaming",
+"health",
+"lifestyle",
+"news",
+"photography",
+"sports",
+"technology",
+"travel",
+"user_cluster_id",
+"ad_cluster_id",
+"avg_ctr"
 ]
 
 pre_train_s = train_all[use_cols]
@@ -105,19 +144,53 @@ pre_train = pre_train_s.copy()
 # 1-3. 学習データの前処理
 # ============================================
 
+# %% --- 曜日を周期エンコーディング
+## 曜日を数値化(マッピング)
+weekday_map = {
+        "Monday":0,
+        "Tuesday":1,
+        "Wednesday":2,
+        "Thursday":3,
+        "Friday":4,
+        "Saturday":5,
+        "Sunday":6,
+    }
+
+# 数値化
+pre_train["weekday_num"] = pre_train["day_of_week"].map(weekday_map)
+
+pre_train["weekday_sin"] = np.sin(2 * np.pi * pre_train["weekday_num"] / 7)
+pre_train["weekday_cos"] = np.cos(2 * np.pi * pre_train["weekday_num"] / 7)
+pre_train = pre_train.drop(columns=["weekday_num","day_of_week"])
+#pre_train.head(10).to_csv(f"../outputs/pre_train_weekday_fqenc_{timestamp}.csv")
+
+# %% --- target_interestをワンホットエンコーディング
+## カンマ区切りをリストに変換
+pre_train["t_interests_list"] = pre_train["target_interests"].str.split(",")
+## リストをワンホットエンコーディング
+df_t_interests = pre_train["t_interests_list"].explode().str.strip().str.get_dummies().rename(columns=lambda col: f"t_{col}").groupby(level=0).sum()
+print("df_t_interests")
+print(df_t_interests.head(10))
+## 元のdfに結合
+pre_train = pd.concat([pre_train, df_t_interests], axis=1)
+pre_train = pre_train.drop(["t_interests_list","target_interests"],axis=1)
+#pre_train.head(10).to_csv(f"../outputs/pre_train_tint_enc_{timestamp}.csv")
+
+
 # %% --- カテゴリカル変数をワンホットエンコーディング
-cat_cols = ["ad_platform","ad_type","user_gender"]
+cat_cols = ["ad_platform","ad_type","target_gender","user_gender"]
 pre_train = pd.get_dummies(pre_train, columns=cat_cols,drop_first=False,dtype=int)
 # pre_train.to_csv(f"../outputs/pre_train_encoded_{timestamp}.csv")
 #print(f"ワンホットエンコーディング後：{pre_train.describe()}")
+#pre_train.head(10).to_csv(f"../outputs/pre_train_catcols_enc_{timestamp}.csv")
+
 
 # %% --- 数値変数を標準化
 scaler = StandardScaler()
-num_cols = ["user_age","user_cluster_id","ad_cluster_id"]
+num_cols = ["duration_days","total_budget","user_age","day_from_start","user_cluster_id","ad_cluster_id"]
 pre_train[num_cols] = scaler.fit_transform(pre_train[num_cols])
-# print(f"標準化後：{pre_train}")
-# pre_train.to_csv(f"../outputs/pre_train_scalered_{timestamp}.csv")
-# print(f"標準化後：{pre_train.describe()}")
+#pre_train.head(10).to_csv(f"../outputs/pre_train_scalered_{timestamp}.csv")
+print(f"標準化後：{pre_train.describe()}")
 
 # ============================================
 # 1-4. 学習データ分割

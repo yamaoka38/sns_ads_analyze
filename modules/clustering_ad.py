@@ -104,7 +104,9 @@ X_train = X_train.merge(ad_stats, on="ad_id", how="left")
 test_all = test_all.merge(ad_stats, on="ad_id", how="left")
 # テストに存在する新しい ad_id は平均値で補完
 test_all[["avg_ctr", "avg_cvr"]] = test_all[["avg_ctr", "avg_cvr"]].fillna(ad_stats[["avg_ctr", "avg_cvr"]].mean())
-#%%
+#%% CSVに出力
+test_all.to_csv(f"../outputs/df_test_all_add_ctrcvr_{timestamp}.csv")
+
 
 # %% --- target_interestsを変換
 ## カンマ区切りをリストに変換

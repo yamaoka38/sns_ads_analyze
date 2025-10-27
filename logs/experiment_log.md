@@ -25,3 +25,32 @@
 - 国はアメリカ・イギリスが上位
 - 広告タイプはストーリーズがやや多めだが、カルーセル・イメージ・動画それぞれ一定数あり
 - 広告プラットフォームはFacebookとInstagramの2種類。Facebookが多め
+
+## 分析内容 Ver5.0
+### 実施内容
+- 簡易特徴量にてclick予測のスクリプトを実行
+    モデル：ロジスティック回帰・ランダムフォレスト・LightGBM
+    評価指標：AUC・Logloss
+    特徴量："ad_platform","ad_type","user_gender","user_age",
+    "click","hour_sin","hour_cos","user_cluster_id","ad_cluster_id"
+
+## 分析結果
+- 現時点では、AUC・Loglossの評価指標は以下の通り
+
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+0      LightGBM          0.7174         0.5015              0.3208
+1  RandomForest          0.9507         0.4944              0.1705
+2  ロジスティック回帰          0.5058         0.4934              0.3366
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3394        22.4383           0.9994
+1             0.9273        93.1737          29.5390
+2             0.3367         0.2916           0.0509
+
+ツリー系モデルではtrainデータに対しての学習は良好だが、testデータに対しては不十分。
+ロジスティック回帰ではtrain、testデータの差はなく過学習はないが、そもそも学習が進んでない。
+LoglossではLightGBM、ロジスティック回帰ともに悪くないスコアだが、そもそもclickが少ない影響といえそう。
+まずは予測に影響を与える特徴量を発見するため、特徴量の見直しが必要。
+
+### 今後の予定
+- 特徴量を見直して予測モデルを再構築
