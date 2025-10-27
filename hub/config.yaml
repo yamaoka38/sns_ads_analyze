@@ -9,6 +9,7 @@ output:
   df_merged: ../outputs/df_merged_pretreatment_{timestamp}.csv
   train_all: ../outputs/df_train_all_{timestamp}.csv
   test_all: ../outputs/df_test_all_{timestamp}.csv
+  test_all_add_ctr-and-cvr:  ../outputs/df_test_all_add_ctrcvr_{timestamp}.csv
   train_all_add_user_cluster_id: ../outputs/df_train_all_user_cluster_id_{timestamp}.csv
   train_all_add_user-and-ad_cluster_id: ../outputs/df_train_all_user-ad_cluster_id_{timestamp}.csv
 
