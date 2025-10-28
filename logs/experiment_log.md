@@ -54,3 +54,65 @@ LoglossではLightGBM、ロジスティック回帰ともに悪くないスコ�
 
 ### 今後の予定
 - 特徴量を見直して予測モデルを再構築
+
+## 分析内容 Ver5.1
+### 実施内容（Ver5.0からの変更点）
+- 特徴量を追加してclick予測のスクリプトを実行
+    モデル：ロジスティック回帰・ランダムフォレスト・LightGBM
+    評価指標：AUC・Logloss
+
+- 目的変数："click"
+- 特徴量：
+"day_of_week", ⇒周期エンコーディング
+"ad_platform",
+"ad_type",
+"target_gender",
+"target_interests",
+"duration_days",
+"total_budget",
+"user_gender",
+"user_age",
+"month",
+"day",
+"day_from_start",
+"hour_sin",
+"hour_cos",
+"art",
+"fashion",
+"finance",
+"fitness",
+"food",
+"gaming",
+"health",
+"lifestyle",
+"news",
+"photography",
+"sports",
+"technology",
+"travel",
+"user_cluster_id",
+"ad_cluster_id",
+"avg_ctr"
+
+
+## 分析結果
+- 現時点では、AUC・Loglossの評価指標は以下の通り
+          model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+0      LightGBM          0.8902         0.5043              0.2957
+1  RandomForest          1.0000         0.5011              0.0816
+2  ロジスティック回帰      0.5120         0.4971              0.3365
+
+   test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3391        26.6097           0.6314
+1             0.3465       173.9100          22.1270
+2             0.3367         2.7449           0.0771
+
+
+特徴量の追加で全体的にtrain_AUCのスコアが向上したが、test_AUCの伸びは微増程度
+⇒過学習が進んだ印象。
+LightGBMのtest_logloss は 0.9273⇒0.3465に大きく改善。
+
+
+### 今後の予定
+- 特徴量を再度見直して予測モデルを再構築
+

@@ -104,42 +104,15 @@ print(train_all.head(10))
 # ============================================
 
 use_cols=[
-"day_of_week",
-"ad_platform",
-"ad_type",
-"target_gender",
-"target_interests",
-"duration_days",
-"total_budget",
-"user_gender",
-"user_age",
 "click",
-"month",
-"day",
-"day_from_start",
-"hour_sin",
-"hour_cos",
-"art",
-"fashion",
-"finance",
-"fitness",
-"food",
-"gaming",
-"health",
-"lifestyle",
-"news",
-"photography",
-"sports",
-"technology",
-"travel",
 "user_cluster_id",
-"ad_cluster_id",
-"avg_ctr"
+"ad_cluster_id"
 ]
 
 pre_train_s = train_all[use_cols]
 pre_train = pre_train_s.copy()
 
+'''
 # ============================================
 # 1-3. 学習データの前処理
 # ============================================
@@ -183,13 +156,13 @@ pre_train = pd.get_dummies(pre_train, columns=cat_cols,drop_first=False,dtype=in
 # pre_train.to_csv(f"../outputs/pre_train_encoded_{timestamp}.csv")
 #print(f"ワンホットエンコーディング後：{pre_train.describe()}")
 #pre_train.head(10).to_csv(f"../outputs/pre_train_catcols_enc_{timestamp}.csv")
-
+'''
 
 # %% --- 数値変数を標準化
 scaler = StandardScaler()
-num_cols = ["duration_days","total_budget","user_age","month","day","day_from_start","user_cluster_id","ad_cluster_id"]
+num_cols = ["user_cluster_id","ad_cluster_id"]
 pre_train[num_cols] = scaler.fit_transform(pre_train[num_cols])
-#pre_train.head(10).to_csv(f"../outputs/pre_train_scalered_{timestamp}.csv")
+pre_train.head(10).to_csv(f"../outputs/pre_train_scalered_{timestamp}.csv")
 print(f"標準化後：{pre_train.describe()}")
 
 # ============================================

@@ -1,4 +1,4 @@
-# sns_ads_analyze.py(Ver5.1)
+# sns_ads_analyze.py(Ver5.2)
 
 ## 概要
 SNS広告のクリック・購入データを用いてユーザー・広告のセグメント化を行い、クリック・購入の行動予測を実施。
@@ -32,6 +32,7 @@ sns_ads_pipline.py を実行
 
 - 目的変数："click"
 - 特徴量：
+・パターン1：クラスタIDを除いて実施（model_click_outid.py）
 "day_of_week", ⇒周期エンコーディング
 "ad_platform",
 "ad_type",
@@ -59,35 +60,65 @@ sns_ads_pipline.py を実行
 "sports",
 "technology",
 "travel",
-"user_cluster_id",
-"ad_cluster_id",
 "avg_ctr"
+
+・パターン2：クラスタIDのみ（model_click_idonly.py）
+"user_cluster_id",
+"ad_cluster_id"
+
+・パターン3：パターン1と2の合算（model_click.py）
+※Ver5.0からmonthとdayの標準化を追加
 
 
 ## 分析結果
 - 現時点では、AUC・Loglossの評価指標は以下の通り
-          model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+パターン1（クラスタID除外）
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+0      LightGBM          0.8858         0.5062              0.2963
+1  RandomForest          1.0000         0.5028              0.0816
+2        LogReg          0.5115         0.4967              0.3365
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3390        17.6834           0.3240
+1             0.3461       139.7476          12.6265
+2             0.3367         0.9416           0.0865
+
+パターン2（クラスタIDのみ）
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+0      LightGBM          0.5157         0.5077              0.3365
+1  RandomForest          0.5157         0.5077              0.3365
+2        LogReg          0.5026         0.4966              0.3366
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3366        31.8236           0.6238
+1             0.3366        22.5926           1.9698
+2             0.3366         0.1035           0.0287
+
+パターン3（パターン1＋2）
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
 0      LightGBM          0.8902         0.5043              0.2957
-1  RandomForest          1.0000         0.5011              0.0816
-2  ロジスティック回帰      0.5120         0.4971              0.3365
+1  RandomForest          1.0000         0.5010              0.0816
+2        LogReg          0.5120         0.4968              0.3365
 
-   test_Logloss_mean  fit_time_mean  score_time_mean
-0             0.3391        26.6097           0.6314
-1             0.3465       173.9100          22.1270
-2             0.3367         2.7449           0.0771
+test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3391        22.5395           0.5736
+1             0.3466       141.6166          14.0647
+2             0.3367         2.5252           0.1530
 
 
-特徴量の追加で全体的にtrain_AUCのスコアが向上したが、test_AUCの伸びは微増程度
-⇒過学習が進んだ印象。
-LightGBMのtest_logloss は 0.9273⇒0.3465に大きく改善。
 
+クラスタIDのみではAUCが低く、行動予測には寄与していない状態。
+逆にクラスタIDを除外してもほとんどスコアは変わらず。
+現時点のクラスタリングでは行動予測には直接寄与はしていないことが分かった。
+そもそもがサンプルデータのため、明確に効く特徴量が存在しない可能性もゼロではないが、特徴量の作り方を見直していく。
 
 ### 今後の予定
-- 特徴量を再度見直して予測モデルを再構築
+- 特徴量を見直すため、改めて既存特徴量の分布やCTRなどを確認
 
 ## バージョン履歴
+**Ver5.2(2025-10-28)**:click予測のスクリプトの特徴量を変更
 **Ver5.1(2025-10-27)**:click予測のスクリプトの特徴量を追加
-**Ver5(2025-10-27)**:click予測のスクリプトを追加
+**Ver5.0(2025-10-27)**:click予測のスクリプトを追加
 **Ver4(2025-10-24)**:ファイル・ディレクトリ構成を変更（各スクリプトをモジュール化）
 **Ver3(2025-10-18)**:全レコードを対象にデータの前処理を実行。その後テストデータと訓練データに分割
 **Ver2(2025-10-17)**:コーディングの仕様変更（#%%を用いた記述に変更。特徴量の分布確認などを実行）

@@ -132,8 +132,6 @@ use_cols=[
 "sports",
 "technology",
 "travel",
-"user_cluster_id",
-"ad_cluster_id",
 "avg_ctr"
 ]
 
@@ -187,7 +185,7 @@ pre_train = pd.get_dummies(pre_train, columns=cat_cols,drop_first=False,dtype=in
 
 # %% --- 数値変数を標準化
 scaler = StandardScaler()
-num_cols = ["duration_days","total_budget","user_age","month","day","day_from_start","user_cluster_id","ad_cluster_id"]
+num_cols = ["duration_days","total_budget","user_age","month","day","day_from_start"]
 pre_train[num_cols] = scaler.fit_transform(pre_train[num_cols])
 #pre_train.head(10).to_csv(f"../outputs/pre_train_scalered_{timestamp}.csv")
 print(f"標準化後：{pre_train.describe()}")
