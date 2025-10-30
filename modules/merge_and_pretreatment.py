@@ -95,6 +95,12 @@ df_merged["hour_cos"] = np.cos(2*np.pi*df_merged["hour"]/24)
 print(df_merged[["timestamp","month","day","day_from_start","hour","hour_sin","hour_cos"]].dtypes,"\n")
 print(df_merged[["timestamp","month","day","day_from_start","hour","hour_sin","hour_cos"]].head(10),"\n")
 
+print(df_merged["timestamp"].head(3))
+print(df_merged["hour"].head(3))
+
+
+'''
+
 
 # %% --- interestを変換
 ## カンマ区切りをリストに変換
@@ -132,3 +138,4 @@ test_all.describe().to_csv(f"../outputs/chk_num_test_all_{timestamp}.csv")
 test_all.describe(exclude='number').to_csv(f"../outputs/chk_cat_test_all_{timestamp}.csv")
 
 
+'''

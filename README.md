@@ -1,4 +1,4 @@
-# sns_ads_analyze.py(Ver5.2)
+# sns_ads_analyze.py(Ver5.3)
 
 ## 概要
 SNS広告のクリック・購入データを用いてユーザー・広告のセグメント化を行い、クリック・購入の行動予測を実施。
@@ -26,96 +26,54 @@ sns_ads_pipline.py を実行
 
 ## 分析内容
 ### 実施内容
-- 簡易特徴量にてclick予測のスクリプトを実行
-    モデル：ロジスティック回帰・ランダムフォレスト・LightGBM
-    評価指標：AUC・Logloss
-
-- 目的変数："click"
-- 特徴量：
-・パターン1：クラスタIDを除いて実施（model_click_outid.py）
-"day_of_week", ⇒周期エンコーディング
-"ad_platform",
-"ad_type",
-"target_gender",
-"target_interests",
-"duration_days",
-"total_budget",
-"user_gender",
-"user_age",
-"month",
-"day",
-"day_from_start",
-"hour_sin",
-"hour_cos",
-"art",
-"fashion",
-"finance",
-"fitness",
-"food",
-"gaming",
-"health",
-"lifestyle",
-"news",
-"photography",
-"sports",
-"technology",
-"travel",
-"avg_ctr"
-
-・パターン2：クラスタIDのみ（model_click_idonly.py）
-"user_cluster_id",
-"ad_cluster_id"
-
-・パターン3：パターン1と2の合算（model_click.py）
-※Ver5.0からmonthとdayの標準化を追加
+- ユーザークラスタIDと広告クラスタIDの掛け合わせによるCTR・CVRを可視化
 
 
 ## 分析結果
-- 現時点では、AUC・Loglossの評価指標は以下の通り
-パターン1（クラスタID除外）
-model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
-0      LightGBM          0.8858         0.5062              0.2963
-1  RandomForest          1.0000         0.5028              0.0816
-2        LogReg          0.5115         0.4967              0.3365
+- CTR
 
-test_Logloss_mean  fit_time_mean  score_time_mean
-0             0.3390        17.6834           0.3240
-1             0.3461       139.7476          12.6265
-2             0.3367         0.9416           0.0865
+CTR	ad_id				
+user_cluster_id	0	1	2	3	4
+0	10.39%	9.89%	11.40%	10.54%	10.03%
+1	10.39%	10.22%	11.85%	10.69%	9.90%
+2	10.59%	10.21%	11.35%	10.90%	9.66%
+3	10.17%	10.57%	11.60%	10.77%	9.80%
+4	10.59%	9.92%	11.78%	10.32%	10.63%
+5	10.39%	10.38%	11.40%	10.37%	10.02%
 
-パターン2（クラスタIDのみ）
-model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
-0      LightGBM          0.5157         0.5077              0.3365
-1  RandomForest          0.5157         0.5077              0.3365
-2        LogReg          0.5026         0.4966              0.3366
-
-test_Logloss_mean  fit_time_mean  score_time_mean
-0             0.3366        31.8236           0.6238
-1             0.3366        22.5926           1.9698
-2             0.3366         0.1035           0.0287
-
-パターン3（パターン1＋2）
-model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
-0      LightGBM          0.8902         0.5043              0.2957
-1  RandomForest          1.0000         0.5010              0.0816
-2        LogReg          0.5120         0.4968              0.3365
-
-test_Logloss_mean  fit_time_mean  score_time_mean
-0             0.3391        22.5395           0.5736
-1             0.3466       141.6166          14.0647
-2             0.3367         2.5252           0.1530
+CVR
+CVR	ad_id				
+user_cluster_id	0	1	2	3	4
+0	6.87%	3.42%	4.61%	2.91%	7.18%
+1	6.76%	3.36%	4.85%	3.78%	7.05%
+2	5.46%	3.42%	4.86%	3.67%	5.63%
+3	5.28%	4.35%	4.76%	3.68%	7.05%
+4	5.74%	3.89%	5.31%	3.16%	8.09%
+5	6.45%	5.21%	5.23%	3.99%	4.37%
 
 
+CTR・CVRともにユーザークラスタIDよりも広告クラスタIDの影響が大きいことが分かった。
+CTRでは広告クラスタID 2、CVRでは広告クラスタID0、5が高い傾向がみられる。
 
-クラスタIDのみではAUCが低く、行動予測には寄与していない状態。
-逆にクラスタIDを除外してもほとんどスコアは変わらず。
-現時点のクラスタリングでは行動予測には直接寄与はしていないことが分かった。
-そもそもがサンプルデータのため、明確に効く特徴量が存在しない可能性もゼロではないが、特徴量の作り方を見直していく。
+- 広告クラスタID 2の特徴
+    - Instagramの比重が高い
+    - 男性比率が高い
+    - 興味関心でFitness・Sportsの比率が高い
+
+- 広告クラスタID 0、5の共通の特徴
+    - 広告タイプでストーリーズの比率が高い（プラットフォームはFacebookの比重が高い）
+
 
 ### 今後の予定
-- 特徴量を見直すため、改めて既存特徴量の分布やCTRなどを確認
+#### クラスタリング
+- CTRにおける広告クラスタの影響に寄与する要因を可視化するため、興味関心を除いたVer・性別を除いたVer・広告プラットフォームを除いたVerでのCTRの変化をそれぞれ検証
+
+#### 行動予測モデル構築
+- ツリー系モデルの過学習をまずは抑えるため、パラメータを調整してAUCの変化を検証
+- その上で特徴量の加工を検討
 
 ## バージョン履歴
+**Ver5.3(2025-10-30)**:ユーザークラスタIDｘ広告クラスタIDのCTR・CVRを可視化
 **Ver5.2(2025-10-28)**:click予測のスクリプトの特徴量を変更
 **Ver5.1(2025-10-27)**:click予測のスクリプトの特徴量を追加
 **Ver5.0(2025-10-27)**:click予測のスクリプトを追加

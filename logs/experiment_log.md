@@ -116,3 +116,48 @@ LightGBMのtest_logloss は 0.9273⇒0.3465に大きく改善。
 ### 今後の予定
 - 特徴量を再度見直して予測モデルを再構築
 
+## 分析内容 Ver5.2
+### 実施内容（Ver5.1からの変更点）
+・クラスターIDを除外したモデリング
+・クラスターIDのみを使ったモデリング
+を実施
+
+## 分析結果
+- 現時点では、AUC・Loglossの評価指標は以下の通り
+パターン1（クラスタID除外）
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+0      LightGBM          0.8858         0.5062              0.2963
+1  RandomForest          1.0000         0.5028              0.0816
+2        LogReg          0.5115         0.4967              0.3365
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3390        17.6834           0.3240
+1             0.3461       139.7476          12.6265
+2             0.3367         0.9416           0.0865
+
+パターン2（クラスタIDのみ）
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+0      LightGBM          0.5157         0.5077              0.3365
+1  RandomForest          0.5157         0.5077              0.3365
+2        LogReg          0.5026         0.4966              0.3366
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3366        31.8236           0.6238
+1             0.3366        22.5926           1.9698
+2             0.3366         0.1035           0.0287
+
+パターン3（パターン1＋2）
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+0      LightGBM          0.8902         0.5043              0.2957
+1  RandomForest          1.0000         0.5010              0.0816
+2        LogReg          0.5120         0.4968              0.3365
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+0             0.3391        22.5395           0.5736
+1             0.3466       141.6166          14.0647
+2             0.3367         2.5252           0.1530
+
+クラスタIDのみではAUCが低く、行動予測には寄与していない状態。
+逆にクラスタIDを除外してもほとんどスコアは変わらず。
+現時点のクラスタリングでは行動予測には直接寄与はしていないことが分かった。
+そもそもがサンプルデータのため、明確に効く特徴量が存在しない可能性もゼロではないが、特徴量の作り方を見直していく。
