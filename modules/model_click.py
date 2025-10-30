@@ -218,13 +218,13 @@ cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0) # クラス比率
 models = {
     "LogReg": LogisticRegression(max_iter=2000),
     "RandomForest": RandomForestClassifier(
-        n_estimators=400, max_depth=None, n_jobs=-1, random_state=0
+        n_estimators=400, max_depth=4, n_jobs=-1, random_state=0
     ),
     "LightGBM": LGBMClassifier(
         n_estimators=600,
         learning_rate=0.05,
-        max_depth=-1,
-        num_leaves=63,
+        max_depth= 8,
+        num_leaves= 15,
         subsample=0.9,
         colsample_bytree=0.8,
         reg_lambda=1.0,
