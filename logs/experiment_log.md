@@ -206,3 +206,56 @@ CTRでは広告クラスタID 2、CVRでは広告クラスタID0、5が高い傾
 #### 行動予測モデル構築
 - ツリー系モデルの過学習をまずは抑えるため、パラメータを調整してAUCの変化を検証
 - その上で特徴量の加工を検討
+
+## 分析内容 Ver5.4
+### 実施内容（Ver5.3からの変更点）
+- クリック予測モデルにおいて過学習抑制のためのパラメータ調整を実施
+    - 検証1：LightGBM＆ランダムフォレストをmax_depth 制限なし⇒8 にした場合
+    - 検証2：LightGBMをmax_depth 制限なし⇒8かつnum_leaves=63⇒30に変更、ランダムフォレストをmax_depth 8 ⇒ 4 に変更
+    - 検証3：LightGBMをmax_depth 制限なし⇒8かつnum_leaves=30⇒15に変更、ランダムフォレストをmax_depth 8 ⇒ 4 に変更
+
+
+## 分析結果
+- 検証1：LightGBM＆ランダムフォレストをmax_depth 制限なし⇒8 にした場合	
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+1      LightGBM          0.8647         0.5036              0.2989
+0  RandomForest          0.6818         0.5120              0.3323
+2        LogReg          0.5120         0.4968              0.3365
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+1             0.3397        21.6187           0.5366
+0             0.3366        61.6760           2.9194
+2             0.3367         1.2292           0.0825
+
+
+- 検証2：LightGBMをmax_depth 制限なし⇒8かつnum_leaves=63⇒30に変更、ランダムフォレストをmax_depth 8 ⇒ 4 に変更
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+1      LightGBM          0.7793         0.5062              0.3162
+0  RandomForest          0.5423         0.5148              0.3362
+2        LogReg          0.5120         0.4968              0.3365
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+1             0.3381        14.4003           0.6605
+0             0.3365        35.3673           1.5161
+2             0.3367         1.2105           0.0799
+
+- 検証3：LightGBMをmax_depth 制限なし⇒8かつnum_leaves=30⇒15に変更、ランダムフォレストをmax_depth 8 ⇒ 4 に変更
+model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+1      LightGBM          0.6950         0.5095              0.3258
+0  RandomForest          0.5423         0.5148              0.3362
+2        LogReg          0.5120         0.4968              0.3365
+
+test_Logloss_mean  fit_time_mean  score_time_mean
+1             0.3373        13.2820           0.6330
+0             0.3365        38.9410           2.5069
+2             0.3367         1.1205           0.0701
+
+⇒検証1~3のいずれにおいてもパラメータを絞ることで、LightGBM、ランダムフォレストでのtrain_AUCは減少し、過学習は抑制の方向に向かったが、それによるtest_AUCの改善はほとんど見られなかった。
+パラメータ調整では本質的な改善に至らず、やはり特徴量の改善が必要と思われる。
+
+### 今後の予定
+#### クラスタリング
+- CTRにおける広告クラスタの影響に寄与する要因を可視化するため、興味関心を除いたVer・性別を除いたVer・広告プラットフォームを除いたVerでのCTRの変化をそれぞれ検証
+
+#### 行動予測モデル構築
+- 特徴量の加工を検討
