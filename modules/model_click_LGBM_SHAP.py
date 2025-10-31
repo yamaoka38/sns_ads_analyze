@@ -133,7 +133,6 @@ use_cols=[
 "travel",
 "user_cluster_id",
 "ad_cluster_id",
-"avg_ctr"
 ]
 
 pre_train_s = train_all[use_cols]
@@ -217,8 +216,8 @@ cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0) # クラス比率
 model = LGBMClassifier(
     n_estimators=600,
     learning_rate=0.05,
-    max_depth= -1,
-    num_leaves= 63,
+    max_depth= 8,
+    num_leaves= 15,
     subsample=0.9,
     colsample_bytree=0.8,
     reg_lambda=1.0,
@@ -264,6 +263,7 @@ explainer = shap.TreeExplainer(model)
 shap_values = explainer.shap_values(X_test)
 
 shap.summary_plot(shap_values, X_test, show=False)
+plt.title("SHAP Vlue(LightGBM max_depth=8,num_leaves=15)",fontsize=14)
 
 plt.savefig(f"../outputs/push/LightGBM_SHAP_{timestamp}.png",bbox_inches="tight",dpi=300)
 plt.close()
