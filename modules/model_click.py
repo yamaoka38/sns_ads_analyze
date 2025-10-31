@@ -163,6 +163,35 @@ pre_train["weekday_cos"] = np.cos(2 * np.pi * pre_train["weekday_num"] / 7)
 pre_train = pre_train.drop(columns=["weekday_num","day_of_week"])
 #pre_train.head(10).to_csv(f"../outputs/pre_train_weekday_fqenc_{timestamp}.csv")
 
+# %% --- 年齢を4カテゴリに分類
+age_q = pd.qcut(pre_train["user_age"],q=4,duplicates="drop")
+pre_train["user_age_q4"] = age_q
+
+# ラベルを読みやすく（例: (18.0, 22.0] → 18–22）
+def interval_to_label(iv):
+    # pandas.Interval → "下限–上限"
+    left = int(np.floor(iv.left))
+    right = int(np.ceil(iv.right))
+    return f"{left}–{right}"
+labels = [interval_to_label(iv) for iv in pre_train["user_age_q4"].cat.categories]
+pre_train["user_age_q4"] = pre_train["user_age_q4"].cat.rename_categories(labels)
+
+
+# 分布を可視化
+count_tbl = pd.crosstab(pre_train["user_age_q4"], pre_train["click"])  # 列:0/1
+count_tbl = count_tbl.rename(columns={0:"Non-Click", 1:"Click"})
+
+count_tbl.plot(kind="bar", figsize=(9,4))
+plt.title("Counts by Age (Quartiles) × Click")
+plt.xlabel("Age (qcut bins)")
+plt.ylabel("Count")
+plt.xticks(rotation=0)
+plt.tight_layout()
+plt.savefig(f"../outputs/push/user_age_q4_{timestamp}.png",bbox_inches="tight",dpi=300)
+plt.show()
+
+pre_train = pre_train.drop(["user_age"],axis=1)
+
 # %% --- target_interestをワンホットエンコーディング
 ## カンマ区切りをリストに変換
 pre_train["t_interests_list"] = pre_train["target_interests"].str.split(",")
@@ -177,16 +206,15 @@ pre_train = pre_train.drop(["t_interests_list","target_interests"],axis=1)
 
 
 # %% --- カテゴリカル変数をワンホットエンコーディング
-cat_cols = ["ad_platform","ad_type","target_gender","user_gender"]
+cat_cols = ["ad_platform","ad_type","target_gender","user_gender","user_age_q4"]
 pre_train = pd.get_dummies(pre_train, columns=cat_cols,drop_first=False,dtype=int)
 # pre_train.to_csv(f"../outputs/pre_train_encoded_{timestamp}.csv")
 #print(f"ワンホットエンコーディング後：{pre_train.describe()}")
 #pre_train.head(10).to_csv(f"../outputs/pre_train_catcols_enc_{timestamp}.csv")
 
-
 # %% --- 数値変数を標準化
 scaler = StandardScaler()
-num_cols = ["duration_days","total_budget","user_age","month","day","day_from_start","user_cluster_id","ad_cluster_id"]
+num_cols = ["duration_days","total_budget","month","day","day_from_start","user_cluster_id","ad_cluster_id"]
 pre_train[num_cols] = scaler.fit_transform(pre_train[num_cols])
 #pre_train.head(10).to_csv(f"../outputs/pre_train_scalered_{timestamp}.csv")
 print(f"標準化後：{pre_train.describe()}")
@@ -217,13 +245,13 @@ cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0) # クラス比率
 models = {
     "LogReg": LogisticRegression(max_iter=2000),
     "RandomForest": RandomForestClassifier(
-        n_estimators=400, max_depth=None, n_jobs=-1, random_state=0
+        n_estimators=400, max_depth=4, n_jobs=-1, random_state=0
     ),
     "LightGBM": LGBMClassifier(
         n_estimators=600,
         learning_rate=0.05,
-        max_depth= -1,
-        num_leaves= 63,
+        max_depth= 8,
+        num_leaves= 15,
         subsample=0.9,
         colsample_bytree=0.8,
         reg_lambda=1.0,

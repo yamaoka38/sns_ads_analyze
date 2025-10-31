@@ -162,6 +162,21 @@ pre_train["weekday_cos"] = np.cos(2 * np.pi * pre_train["weekday_num"] / 7)
 pre_train = pre_train.drop(columns=["weekday_num","day_of_week"])
 #pre_train.head(10).to_csv(f"../outputs/pre_train_weekday_fqenc_{timestamp}.csv")
 
+# %% --- 年齢を4カテゴリに分類
+age_q = pd.qcut(pre_train["user_age"],q=4,duplicates="drop")
+pre_train["user_age_q4"] = age_q
+
+# ラベルを読みやすく（例: (18.0, 22.0] → 18–22）
+def interval_to_label(iv):
+    # pandas.Interval → "下限–上限"
+    left = int(np.floor(iv.left))
+    right = int(np.ceil(iv.right))
+    return f"{left}–{right}"
+labels = [interval_to_label(iv) for iv in pre_train["user_age_q4"].cat.categories]
+pre_train["user_age_q4"] = pre_train["user_age_q4"].cat.rename_categories(labels)
+
+pre_train = pre_train.drop(["user_age"],axis=1)
+
 # %% --- target_interestをワンホットエンコーディング
 ## カンマ区切りをリストに変換
 pre_train["t_interests_list"] = pre_train["target_interests"].str.split(",")
@@ -176,7 +191,7 @@ pre_train = pre_train.drop(["t_interests_list","target_interests"],axis=1)
 
 
 # %% --- カテゴリカル変数をワンホットエンコーディング
-cat_cols = ["ad_platform","ad_type","target_gender","user_gender"]
+cat_cols = ["ad_platform","ad_type","target_gender","user_gender","user_age_q4"]
 pre_train = pd.get_dummies(pre_train, columns=cat_cols,drop_first=False,dtype=int)
 # pre_train.to_csv(f"../outputs/pre_train_encoded_{timestamp}.csv")
 #print(f"ワンホットエンコーディング後：{pre_train.describe()}")
@@ -185,7 +200,7 @@ pre_train = pd.get_dummies(pre_train, columns=cat_cols,drop_first=False,dtype=in
 
 # %% --- 数値変数を標準化
 scaler = StandardScaler()
-num_cols = ["duration_days","total_budget","user_age","month","day","day_from_start","user_cluster_id","ad_cluster_id"]
+num_cols = ["duration_days","total_budget","month","day","day_from_start","user_cluster_id","ad_cluster_id"]
 pre_train[num_cols] = scaler.fit_transform(pre_train[num_cols])
 #pre_train.head(10).to_csv(f"../outputs/pre_train_scalered_{timestamp}.csv")
 print(f"標準化後：{pre_train.describe()}")

@@ -274,3 +274,42 @@ test_Logloss_mean  fit_time_mean  score_time_mean
 #### 行動予測モデル構築
 - まずは、情報リークしている平均CTRを除外して再度モデル構築を進める
 
+## 分析内容 Ver5.6
+### 実施内容（Ver5.5からの変更点）
+- 情報がリークしている恐れがある広告ID毎の平均CTRを特徴量から除いて検証
+    - 検証1：LightGBMをmax_depth=8かつnum_leaves=15、ランダムフォレストをmax_depth=4
+    - 検証2：LightGBMをmax_depth=-1かつnum_leaves=63、ランダムフォレストをmax_depth=None
+
+## 分析結果
+- 各検証の結果は以下の通り
+    - 検証1：LightGBMをmax_depth=8かつnum_leaves=15、ランダムフォレストをmax_depth=4
+            model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+        0  RandomForest          0.5511         0.5048              0.3363
+        1      LightGBM          0.7011         0.5036              0.3263
+        2        LogReg          0.5121         0.4970              0.3365
+
+        test_Logloss_mean  fit_time_mean  score_time_mean
+        0             0.3366        37.0677           1.6104
+        1             0.3375        14.8037           0.5990
+        2             0.3367         1.1974           0.0849
+
+    - 検証2：LightGBMをmax_depth=-1かつnum_leaves=63、ランダムフォレストをmax_depth=None
+            model  train_AUC_mean  test_AUC_mean  train_Logloss_mean  \
+        0  RandomForest          1.0000         0.5023              0.0816
+        1      LightGBM          0.8920         0.5021              0.2966
+        2        LogReg          0.5121         0.4970              0.3365
+
+        test_Logloss_mean  fit_time_mean  score_time_mean
+        0             0.3455       159.0806          22.4799
+        1             0.3391        25.6162           0.7162
+        2             0.3367         1.1338           0.0771
+
+- 平均CTRを除いても目立った変化は無かった
+- 改めて上記検証1、2それぞれの条件でSHAP値を出したが、平均CTRの影響を受けている広告クラスタIDの寄与度が上昇
+    - 以後は過学習を抑制している検証1のパラメータ設定をベースに進める
+
+### 今後の予定
+#### 行動予測モデル構築
+- 引き続き特徴量を検証
+    - 検証1：寄与度の高い年齢をカテゴリ分けして検証
+    - 検証2：カテゴリ数の多い興味関心(ターゲット・ユーザー)をPCAで次元削減して検証
