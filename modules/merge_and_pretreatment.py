@@ -77,8 +77,31 @@ df_merged["engagement"] = np.where((df_merged["event_type_Comment"]==1) |(df_mer
 # %% CSVでdfを確認
 # df_merged.head(100).to_csv(f"../outputs/df_merged_pre_event_chk_head100_{timestamp}.csv")
 
+
 # ============================================
-# 1-2. 特徴量の処理
+# 1-2. 全体の数値確認
+# ============================================
+
+# %% 全体のCTR・CVR・予算・CPC・CPAを算出
+
+all_imps = df_merged["imp"].sum()
+all_clicks = df_merged["click"].sum()
+all_cvs = df_merged["Purchase"].sum()
+all_costs = df_cps["total_budget"].sum()
+
+ctr = all_clicks / all_imps
+cvr = all_cvs / all_clicks
+cpm = all_costs / all_imps *1000
+cpc = all_costs / all_clicks
+cpa = all_costs / all_cvs
+
+print(f"imps:{all_imps},clicks:{all_clicks},cvs:{all_cvs},costs:{all_costs}\n")
+print(f"ctr:{ctr},cvr:{cvr},cpm:{cpm},cpc:{cpc},cpa:{cpa}\n")
+
+
+
+# ============================================
+# 1-3. 特徴量の処理
 # ============================================
 # %% timestampから月・日・開始日からの経過日数カラムと時間カラムを作成
 df_merged["timestamp"] = pd.to_datetime(df_merged["timestamp"]) # timestampをdatetime型に変換
@@ -94,12 +117,6 @@ df_merged["hour_cos"] = np.cos(2*np.pi*df_merged["hour"]/24)
 # 処理結果を確認
 print(df_merged[["timestamp","month","day","day_from_start","hour","hour_sin","hour_cos"]].dtypes,"\n")
 print(df_merged[["timestamp","month","day","day_from_start","hour","hour_sin","hour_cos"]].head(10),"\n")
-
-print(df_merged["timestamp"].head(3))
-print(df_merged["hour"].head(3))
-
-
-'''
 
 
 # %% --- interestを変換
@@ -118,7 +135,7 @@ print(df_merged.head(10))
 df_merged.to_csv(f"../outputs/df_merged_pretreatment_{timestamp}.csv")
 
 # ============================================
-# 1-3. 学習データとテストデータの分割
+# 1-4. 学習データとテストデータの分割
 # ============================================
 # %% 目的変数を設定せずに、Clickの比率を維持したまま分割
 train_idx, test_idx = train_test_split(df_merged.index,test_size=0.2, random_state=0, stratify=df_merged["click"])
@@ -136,6 +153,3 @@ train_all.describe(exclude='number').to_csv(f"../outputs/chk_cat_train_all_{time
 
 test_all.describe().to_csv(f"../outputs/chk_num_test_all_{timestamp}.csv")
 test_all.describe(exclude='number').to_csv(f"../outputs/chk_cat_test_all_{timestamp}.csv")
-
-
-'''
