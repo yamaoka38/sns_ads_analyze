@@ -13,7 +13,7 @@ import re
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
@@ -237,6 +237,97 @@ print(cluster_summary)
 df_cluster_feat = pd.concat([cluster_summary,agg],axis=1)
 print(df_cluster_feat)
 df_cluster_feat.to_csv(f"../outputs/push/df_clustering_ad_feat_k={k}_{timestamp}.csv")
+
+# %% -- ヒートマップ画像作成
+# 数値を正規化
+df_scaled = df_cluster_feat.copy()
+scaler = MinMaxScaler()
+df_scaled[df_scaled.columns] = scaler.fit_transform(df_scaled)
+
+# dfを分割（可視化しやすくする）
+cols1 = [
+    "duration_days",
+    "total_budget",
+    "ad_platform_Facebook",
+    "ad_platform_Instagram",
+    "ad_type_Carousel",
+    "ad_type_Image",
+    "ad_type_Stories",
+    "ad_type_Video",
+    "target_gender_All",
+    "target_gender_Female",
+    "target_gender_Male",
+    "target_age_group_18-24",
+    "target_age_group_25-34",
+    "target_age_group_35-44",
+    "target_age_group_All",
+    "impressions",
+    "clicks",
+    "conversions",
+    "CTR",
+    "CVR",
+    "CTVR"
+]
+
+cols2 = [
+    "art",
+    "fashion",
+    "finance",
+    "fitness",
+    "food",
+    "gaming",
+    "health",
+    "lifestyle",
+    "news",
+    "photography",
+    "sports",
+    "technology",
+    "travel",
+    "impressions",
+    "clicks",
+    "conversions",
+    "CTR",
+    "CVR",
+    "CTVR"
+]
+
+df_cluster_feat1 = df_cluster_feat[cols1]
+df_cluster_feat2 = df_cluster_feat[cols2]
+df_scaled1 = df_scaled[cols1]
+df_scaled2 = df_scaled[cols2]
+
+
+# ヒートマップ描画
+fig,axes = plt.subplots(2,1,figsize=(12,10))
+
+sns.heatmap(
+    df_scaled1,
+    cmap="coolwarm",
+    annot=df_cluster_feat1.round(2),
+    fmt="",
+    linewidth=0.5,
+    cbar=True,
+    ax=axes[0]
+)
+axes[0].set_title("ad_cluster_feat(1)",fontsize=14)
+
+sns.heatmap(
+    df_scaled2,
+    cmap="coolwarm",
+    annot=df_cluster_feat2.round(2),
+    fmt="",
+    linewidth=0.5,
+    cbar=True,
+    ax=axes[1]
+)
+axes[1].set_title("ad_cluster_feat(2)",fontsize=14)
+
+
+plt.tight_layout()
+
+# ④ 画像として保存
+plt.savefig(f"../outputs/push/cluster_feat_heatmap_ad_{timestamp}.png", dpi=150)
+plt.show()
 
 
 # ============================================

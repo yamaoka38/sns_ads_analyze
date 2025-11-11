@@ -11,7 +11,7 @@ import re
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
@@ -236,7 +236,29 @@ df_cluster_feat_drop = df_cluster_feat.copy()
 df_cluster_feat_drop = df_cluster_feat_drop.drop(columns=drop_list,axis=1)
 print(df_cluster_feat_drop)
 df_cluster_feat_drop.to_csv(f"../outputs/push/df_clustering_user_feat_k={k}_{timestamp}.csv")
-# %%
+
+# %% -- ヒートマップ画像作成
+# 数値を正規化
+df_scaled = df_cluster_feat_drop.copy()
+scaler = MinMaxScaler()
+df_scaled[df_scaled.columns] = scaler.fit_transform(df_scaled)
+
+# ヒートマップ描画
+plt.figure(figsize=(14,6))
+sns.heatmap(
+    df_scaled,
+    cmap="coolwarm",
+    annot=df_cluster_feat_drop.round(2),
+    fmt="",
+    linewidth=0.5,
+    cbar=True
+)
+plt.title("user_cluster_feat",fontsize=14)
+plt.tight_layout()
+
+# ④ 画像として保存
+plt.savefig(f"../outputs/push/cluster_feat_heatmap_user_{timestamp}.png", dpi=150)
+plt.show()
 
 # ============================================
 # 2-4. ユーザークラスタIDを元データに結合
