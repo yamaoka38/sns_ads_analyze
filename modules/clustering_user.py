@@ -134,14 +134,18 @@ print(Y_km)
 
 
 # %% クラスタリングの評価
-# silhouette = silhouette_score(X_train_arr, Y_km) #シルエットスコアは計算が重いので割愛
+rng = np.random.default_rng(42)
+sample_idx = rng.choice(len(X_train_arr), 10000, replace=False) #シルエットスコアの対象データをランダムに抽出
+silhouette = silhouette_score(X_train_arr[sample_idx], Y_km[sample_idx])
 dbi = davies_bouldin_score(X_train_arr, Y_km)
 ch = calinski_harabasz_score(X_train_arr, Y_km)
 
-# print(f"Silhouette Score: {silhouette:.3f}")
+
+
+print(f"Silhouette Score: {silhouette:.3f}")
 print(f"Davies-Bouldin Index: {dbi:.3f}")
 print(f"Calinski-Harabasz Index: {ch:.3f}")
-
+'''
 # ============================================
 # 2-2. 2次元散布図で可視化
 # ============================================
@@ -257,7 +261,7 @@ plt.title("user_cluster_feat",fontsize=14)
 plt.tight_layout()
 
 # ④ 画像として保存
-plt.savefig(f"../outputs/push/cluster_feat_heatmap_user_{timestamp}.png", dpi=150)
+plt.savefig(f"../outputs/push/figures/cluster_feat_heatmap_user_{timestamp}.png", dpi=150)
 plt.show()
 
 # ============================================
@@ -267,3 +271,4 @@ plt.show()
 Y_km_s = pd.Series(Y_km, index=train_all.index, name="user_cluster_id")
 df_add_id = train_all.join(Y_km_s)
 df_add_id.to_csv(f"../outputs/df_train_all_user_cluster_id_{timestamp}.csv")
+'''

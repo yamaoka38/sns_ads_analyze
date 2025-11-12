@@ -56,6 +56,11 @@ check_data(df_merged)
 # %% event_typeをワンホットエンコーディングで各カラムに変換
 df_merged = pd.get_dummies(df_merged,columns=['event_type'],dtype=int)
 
+# 処理前のimp、click数を確認
+print(f"raw imp:{df_merged["event_type_Impression"].sum()}")
+print(f"raw click:{df_merged["event_type_Click"].sum()}")
+
+
 ########################################################
 # 1. 前処理（分割前）
 ########################################################

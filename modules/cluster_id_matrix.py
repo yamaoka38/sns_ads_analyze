@@ -117,5 +117,5 @@ axes[2].set_title("cluster_matrix_ctvr",fontsize=14)
 plt.tight_layout()
 
 # ④ 画像として保存
-plt.savefig(f"../outputs/push/cluster_matrix_heatmap_{timestamp}.png", dpi=150)
+plt.savefig(f"../outputs/push/figures/cluster_matrix_heatmap_{timestamp}.png", dpi=150)
 plt.show()
