@@ -122,8 +122,8 @@ print(f'ワンホットエンコーディング結果：{u.head(10)}')
 u_encoded = u.copy()
 # 数値を標準化
 scaler = StandardScaler()
-# num_cols = ["user_age","imp_cnt","click_cnt","purch_cnt","eng_cnt","avg_hour"]
-num_cols = ["user_age","avg_hour"]
+num_cols = ["user_age","imp_cnt","click_cnt","purch_cnt","eng_cnt","avg_hour"]
+#num_cols = ["user_age","avg_hour"]
 u_encoded[num_cols] = scaler.fit_transform(u_encoded[num_cols])
 print(f'標準化結果：{u_encoded.head(10)}')
 #後処理用に、下記も計算
@@ -201,14 +201,14 @@ plt.show()
 # 2-3. クラスタごとの特徴量を可視化
 # ============================================
 # %% クラスタ番号をdf1に結合
-Y_km_s = pd.Series(Y_km, index=u.index, name="cluster")
+Y_km_s = pd.Series(Y_km, index=u.index, name="user_cluster_id")
 df = u.join(Y_km_s)
 df.head(100).to_csv(f"../outputs/df_X_train_add_userid_clustering_id_k={k}_head100_{timestamp}.csv")
 
 # %% クラスタ毎のCTR・CVR・CTVRを計算
 agg = (
     df
-    .groupby("cluster", dropna=False)
+    .groupby("user_cluster_id", dropna=False)
     .agg(
         impressions=("imp_cnt", "sum"),
         clicks=("click_cnt", "sum"),
@@ -227,7 +227,7 @@ print(agg)
 #%%
 
 # %% 各クラスタの特徴量傾向を把握(数値の平均値)
-cluster_summary = df.assign(cluster=Y_km).groupby("cluster").mean(numeric_only=True)
+cluster_summary = df.assign(cluster=Y_km).groupby("user_cluster_id").mean(numeric_only=True)
 print(cluster_summary)
 
 # %% 全出力をマージ
@@ -264,12 +264,14 @@ plt.tight_layout()
 plt.savefig(f"../outputs/push/figures/cluster_feat_heatmap_userid_{timestamp}.png", dpi=150)
 plt.show()
 
-'''
+
 # ============================================
 # 2-4. ユーザークラスタIDを元データに結合
 # ============================================
 # %% クラスタ番号をtrain_allに結合
-Y_km_s = pd.Series(Y_km, index=train_all.index, name="user_cluster_id")
-df_add_id = train_all.join(Y_km_s)
-df_add_id.to_csv(f"../outputs/df_train_all_user_cluster_id_{timestamp}.csv")
-'''
+#Y_km_s = pd.Series(Y_km, index=train_all.index, name="user_cluster_id")
+#df_add_id = train_all.join(Y_km_s)
+
+df_add_cluster_id = train_all.merge(df[["user_id","user_cluster_id"]],on="user_id",how="left")
+df[["user_id","user_cluster_id"]].to_csv(f"../outputs/userid_clusterid_list_{timestamp}.csv")
+df_add_cluster_id.to_csv(f"../outputs/df_train_all_userid_cluster_id_{timestamp}.csv")

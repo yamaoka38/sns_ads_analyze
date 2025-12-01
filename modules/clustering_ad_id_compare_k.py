@@ -1,7 +1,9 @@
 ########################################################
-# 0. 事前準備（データの読み込みと確認）
+#  0. 事前準備（データの読み込みと確認）
 ########################################################
-
+# ============================================
+# 0-1. 必要なモジュールのインポート
+# ============================================
 # %% 必要なモジュールのインポート
 import yaml
 from tkinter.constants import X
@@ -27,19 +29,21 @@ print(timestamp)
 with open("../hub/config.yaml", "r", encoding="utf-8") as f:
     cfg = yaml.safe_load(f)
 
-# %% --- 学習データを読み込み
+# ============================================
+# 0-2. 学習データを読み込み
+# ============================================
 # 出力フォルダを指定
 output_dir = Path("../outputs")
 
 # ファイル名のパターン（例：user_clusters_20251024_1530.csv）
-pattern = re.compile(r"df_train_all_\d{8}_\d{4}\.csv$")
+pattern = re.compile(r"df_train_all_userid_cluster_id_\d{8}_\d{4}\.csv$")
 
 # フォルダ内のファイルを検索 → パターンに一致するものだけ取得
-files = sorted([f for f in output_dir.glob("df_train_all_*.csv") if pattern.search(f.name)])
+files = sorted([f for f in output_dir.glob("df_train_all_userid_cluster_id*.csv") if pattern.search(f.name)])
 
 # ファイルが見つからなかった場合はエラー
 if not files:
-    raise FileNotFoundError("df_train_all_YYYYMMDD_HHMM.csv の形式に合うファイルが見つかりません。")
+    raise FileNotFoundError("df_train_all_userid_cluster_id_YYYYMMDD_HHMM.csv の形式に合うファイルが見つかりません。")
 
 # 最新ファイルを選択（ファイル名昇順の最後＝最新）
 latest_file = files[-1]
@@ -48,105 +52,108 @@ print(f"読み込み対象ファイル: {latest_file.name}")
 # CSVを読み込み
 train_all = pd.read_csv(latest_file)
 
+# ============================================
+# 0-3. テストデータを読み込み
+# ============================================
+# %% --- テストデータを読み込み
+# ファイル名のパターン（例：user_clusters_20251024_1530.csv）
+pattern_test = re.compile(r"df_test_all_\d{8}_\d{4}\.csv$")
+
+# フォルダ内のファイルを検索 → パターンに一致するものだけ取得
+files_test = sorted([f for f in output_dir.glob("df_test_all_*.csv") if pattern_test.search(f.name)])
+
+# ファイルが見つからなかった場合はエラー
+if not files_test:
+    raise FileNotFoundError("df_test_all_YYYYMMDD_HHMM.csv の形式に合うファイルが見つかりません。")
+
+# 最新ファイルを選択（ファイル名昇順の最後＝最新）
+latest_file_test = files_test[-1]
+print(f"読み込み対象ファイル(テスト): {latest_file_test.name}")
+
+# CSVを読み込み
+test_all = pd.read_csv(latest_file_test)
+
 ########################################################
 # 1. 前処理
 ########################################################
-
 # ============================================
-# 1-1. 集計前の処理
-# ============================================
-
-# %% 曜日を周期エンコーディング
-## 曜日を数値化(マッピング)
-weekday_map = {
-        "Monday":0,
-        "Tuesday":1,
-        "Wednesday":2,
-        "Thursday":3,
-        "Friday":4,
-        "Saturday":5,
-        "Sunday":6,
-    }
-
-# 数値化
-train_all["weekday_num"] = train_all["day_of_week"].map(weekday_map)
-
-train_all["weekday_sin"] = np.sin(2 * np.pi * train_all["weekday_num"] / 7)
-train_all["weekday_cos"] = np.cos(2 * np.pi * train_all["weekday_num"] / 7)
-train_all = train_all.drop(columns=["weekday_num","day_of_week"])
-
-print(train_all.head(5))
-
-
-# ============================================
-# 1-2. ユーザーIDで集計したテーブル作成
+# 1-1. ユーザーIDで集計したテーブル作成
 # ============================================
 
-
-
-
-# ユーザー集約テーブル作成（学習期間のみで作る）
-u = train_all.groupby('user_id').agg(
+# 広告集約テーブル作成（学習期間のみで作る）
+a = train_all.groupby('ad_id').agg(
     imp_cnt=('imp', 'sum'),
     click_cnt=('click', 'sum'),
     purch_cnt=('Purchase', 'sum'),
     eng_cnt=('engagement', 'sum'),
-    avg_hour=('hour', 'mean'),
-    avg_weekday_sin=('weekday_sin', 'mean'),
-    avg_weekday_cos=('weekday_cos', 'mean'),
-    
-).reset_index()
+#    avg_hour=('hour', 'mean'),
+#    avg_weekday_sin=('weekday_sin', 'mean'),
+#    avg_weekday_cos=('weekday_cos', 'mean'),
+    ).reset_index()
 
 # 比率指標を追加
-u['ctr'] = (u['click_cnt'] / u['imp_cnt'].clip(lower=1)).fillna(0)
-u['cvr'] = (u['purch_cnt'] / u['click_cnt'].clip(lower=1)).fillna(0)
-u['eng_rate'] = (u['eng_cnt'] / u['imp_cnt'].clip(lower=1)).fillna(0)
+a['ctr'] = (a['click_cnt'] / a['imp_cnt'].clip(lower=1)).fillna(0)
+a['cvr'] = (a['purch_cnt'] / a['click_cnt'].clip(lower=1)).fillna(0)
+a['eng_rate'] = (a['eng_cnt'] / a['imp_cnt'].clip(lower=1)).fillna(0)
 
 # 属性情報を結合
-# 興味関心一覧（割愛）　    "art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"
-user_attrs = train_all[
-    ['user_id','user_age','user_gender',]
-    ].drop_duplicates('user_id')
-print("user_attrs.head()")
-print(user_attrs.head())
-u = u.merge(user_attrs, on='user_id', how='left')
-print("u.head()")
-print(u.head())
+ad_attrs = train_all[
+    ['ad_id','ad_platform','ad_type','target_gender','target_age_group','target_interests']
+    ].drop_duplicates('ad_id')
+print("ad_attrs.head()")
+print(ad_attrs.head())
+a = a.merge(ad_attrs, on='ad_id', how='left')
+print("a.head()")
+print(a.head())
 
 # ============================================
-# 1-3. 特徴量変換
+# 1-2. 特徴量変換
 # ============================================
+
+# %% --- target_interestsを変換
+a["t_interests_list"] = a["target_interests"].str.split(",")
+## リストをワンホットエンコーディング
+df_t_interests = a["t_interests_list"].explode().str.strip().str.get_dummies().groupby(level=0).sum()
+print("df_t_interests")
+print(df_t_interests.head(10))
+## 元のdfに結合
+a = pd.concat([a, df_t_interests], axis=1)
+a = a.drop(["t_interests_list","target_interests"],axis=1)
+print(a.head())
+
+# PCAで次元圧縮
+pca = PCA(n_components=2)
+df_t_interests_pca = pca.fit_transform(df_t_interests)
+a["pca_interest_1"] = df_t_interests_pca[:, 0]
+a["pca_interest_2"] = df_t_interests_pca[:, 1]
 
 # カテゴリカル変数をワンホットエンコーディング
-cat_cols = ["user_gender"]
-u_encoded = pd.get_dummies(u, columns=cat_cols, drop_first=False, dtype=int)
-print(f'ワンホットエンコーディング結果：{u_encoded.head(10)}')
+cat_cols = ['ad_platform','ad_type','target_gender','target_age_group']
+a = pd.get_dummies(a, columns=cat_cols, drop_first=False, dtype=int)
+print(f'ワンホットエンコーディング結果：{a.head(10)}')
+
+a_encoded = a.copy()
+
 
 # 数値を標準化
 scaler = StandardScaler()
-num_cols = ["user_age","imp_cnt","click_cnt","purch_cnt","eng_cnt","avg_hour"]
-# num_cols = ["user_age","avg_hour"]
-u_encoded[num_cols] = scaler.fit_transform(u_encoded[num_cols])
-print(f'標準化結果：{u_encoded.head(10)}')
-#後処理用に、下記も計算
-mean_age = u["user_age"].mean()
-std_age = u["user_age"].std()
-print(f'平均年齢：{mean_age}')
-print(f'年齢標準偏差：{std_age}')
+num_cols = ["imp_cnt","click_cnt","purch_cnt","eng_cnt"]
+a_encoded[num_cols] = scaler.fit_transform(a_encoded[num_cols])
 
-print(u_encoded.head(5))
-
-u_encoded_drop = u_encoded.drop(columns=["user_id"])
+a_encoded = a_encoded.drop(columns=["ad_id","art","fashion","finance","fitness","food","gaming","health","lifestyle","news","photography","sports","technology","travel"])
+#a_encoded = a_encoded.drop(columns=num_cols)
+print(a_encoded.head())
 
 
 ########################################################
-# 2. クラスタリング（最適なkを検証）
+# 2. クラスタリング
 ########################################################
 # ============================================
 # 2-1. クラスタリング実施
 # ============================================
+
 # %% 訓練データをdfからarrayに変換
-X_train_arr = u_encoded_drop.to_numpy()
+X_train_arr = a_encoded.to_numpy()
 
 # まずはkの検証範囲を設定
 k_range = range(2, 11)
@@ -179,7 +186,7 @@ score_df = pd.DataFrame({
     "CH": ch_list
 })
 
-score_df.to_csv(f"../outputs/push/figures/clustering_user_score_compare-k_{timestamp}.csv")
+score_df.to_csv(f"../outputs/push/figures/clustering_adid_score_compare-k_{timestamp}.csv")
 
 # ベストスコアを確認
 best_k_sil = score_df.loc[score_df["SIL"].idxmax(), "k"]
@@ -216,7 +223,5 @@ ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left")
 # グラフタイトルと凡例
 fig.suptitle("SIL (↑) & DBI (↓) & CH (↑) by Cluster Number", fontsize=13)
 fig.tight_layout()
-plt.savefig(f"../outputs/push/figures/kmeans_clusters_user_compare_k_{timestamp}.png", dpi=300, bbox_inches="tight")
+plt.savefig(f"../outputs/push/figures/kmeans_clusters_adid_compare_k_{timestamp}.png", dpi=300, bbox_inches="tight")
 plt.show()
-
-
