@@ -49,6 +49,9 @@ print(df_drop.head())
 ########################################################
 # 1. クラスタリング
 ########################################################
+# ============================================
+# 1-1. クラスタリング実施
+# ============================================
 # df_dropをarrayに変換
 X_train_arr = df_drop.to_numpy()
 
@@ -74,7 +77,7 @@ print(f"Davies-Bouldin Index: {dbi:.3f}")
 print(f"Calinski-Harabasz Index: {ch:.3f}")
 
 # ============================================
-# 2-2. 2次元散布図で可視化
+# 1-2. 2次元散布図で可視化
 # ============================================
 # %% PCAで特徴量を2次元に圧縮
 pca = PCA(n_components=2, random_state=0)
@@ -94,3 +97,30 @@ plt.title('K-means Clusters_User_v1_ (PCA 2D Projection)')
 plt.legend()
 plt.savefig(f'../outputs/push/figures/kmeans_clustering_user_id_k={k}_{timestamp}.png', dpi=300, bbox_inches='tight')
 plt.show()
+
+# ============================================
+# 1-3. ユーザーIDとクラスタIDのデータフレーム作成
+# ============================================
+cluster_df = pd.DataFrame({
+    "user_id": df["user_id"].values,
+    "cluster_id": Y_km
+})
+
+print(cluster_df.head())
+print(cluster_df.shape)
+
+########################################################
+# 2. クラスタリング結果をBigQueryに送信
+########################################################
+
+# 送信したいBigQueryテーブル
+push_table_id = "sns-ads-analyze.user_id_cluster.cluster_id_user"
+
+job_config = bigquery.LoadJobConfig(
+    write_disposition="WRITE_TRUNCATE"   # ←既存テーブルを上書き
+)
+
+job = client.load_table_from_dataframe(cluster_df, push_table_id, job_config=job_config)
+job.result()  # 完了待ち
+
+print("BigQuery に書き込みました！")
